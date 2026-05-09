@@ -6,6 +6,8 @@ This repository implements a **Kafka + Spark + PostGIS** pipeline that correlate
 
 **Phase 3** adds **GeoJSON / centroid presentation views** for maps (`analytics.v_latest_smoke_risk_*_geojson`, point GeoJSON for fires/AQ), **Grafana geomap panels** (centroid markers; GeoJSON preview tables for polygons), **SLI views + `analytics.fn_alert_candidates`**, **`make alerts-check`** (thresholds via `ALERT_*` env vars), **multi-state census bootstrap** (`CENSUS_STATEFPS`, optional national counties), **materialized snapshots** + **`make refresh-mviews`**, and **`make demo`** as a **no-secrets** local walkthrough.
 
+**Phase 4** adds **`analytics.alert_events`** (stable fingerprints + deduped open incidents), **`make alerts-materialize`** / **`make alerts-send`** with **console / webhook / Slack / SMTP** notifiers, **operator runbooks** under `docs/runbooks/`, **bounded `make ingest-live-once`** (requires `FIRMS_MAP_KEY`; rejects huge bboxes unless explicitly allowed), and **`make operational-cycle`** for a repeatable fixture or live loop.
+
 **Important:** the risk score is a **demonstration / operations correlation index**, not a health advisory model.
 
 ## What this project does
@@ -166,6 +168,63 @@ make grafana-up
 - **CLI:** `make alerts-check` prints candidates and exits **2** if any **`severity = critical`** exists. Set **`ALERTS_WARN_ONLY=1`** to always exit 0 (recommended for fixture demos where timestamps are intentionally stale).
 - **Threshold env:** `ALERT_FRESHNESS_WARN_HOURS` (default 6), `ALERT_FRESHNESS_CRITICAL_HOURS` (24), `ALERT_HIGH_RISK_MIN_SCORE` (75), `ALERT_LOOKBACK_HOURS` (24).
 
+### Phase 4 — persisted alerts, notifications, bounded live ingest
+
+**Lifecycle**
+
+1. SQL surfaces candidates (`fn_alert_candidates` / `v_alert_candidates`).
+2. `make alerts-materialize` reads candidates, computes a stable **fingerprint** per logical incident, and **upserts** `analytics.alert_events` (refreshing `last_seen_at` while `status` is `open`/`acknowledged`).
+3. `make alerts-send` delivers **open** rows through the selected notifier and records per-notifier metadata inside `notification_state` JSON (skipping repeats unless **`FORCE_NOTIFY=1`**).
+4. Optional `ALERTS_RESOLVE_MISSING=1` resolves **open** rows whose fingerprints disappear from the latest candidate set (use carefully with oscillating fixture data).
+
+**Deduping**
+
+- Partial unique index on **`fingerprint`** while `status IN ('open','acknowledged')` prevents duplicate active incidents.
+- Fingerprints **exclude** wall-clock `observed_at`; they combine normalized severity, geography keys, alert type, and small stable details (e.g., ingestion `source`, smoke-risk `model_version`/`risk_band`).
+
+**Materialize env**
+
+- `ALERTS_DRY_RUN=1` — print planned upserts without writes.
+- `ALERTS_RESOLVE_MISSING=1` — auto-resolve stale open incidents missing from the candidate snapshot.
+
+**Notifier env**
+
+- `ALERT_NOTIFIER` — `console` (default), `webhook`, `slack`, `smtp` / `email`.
+- `ALERT_SEVERITY_MIN` — `info`, `warning`, `high`, `critical` (default **`high`**). SQL `warn` maps to `warning`, except **`high_smoke_risk` warn → `high`**.
+- `ALERT_LIMIT` — max rows scanned from open incidents (default **20**).
+- `FORCE_NOTIFY=1` — bypass “already sent for this `last_seen_at`” suppression.
+- Webhook: `ALERT_WEBHOOK_URL`, optional `ALERT_WEBHOOK_HEADERS_JSON` (object JSON for extra headers).
+- Slack incoming webhook: `SLACK_WEBHOOK_URL`.
+- SMTP: `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASSWORD`, `ALERT_EMAIL_FROM`, `ALERT_EMAIL_TO`.
+
+**Bounded live ingest**
+
+```bash
+export FIRMS_MAP_KEY=...           # required
+export OPENAQ_API_KEY=...          # optional depending on tenant behavior
+export LIVE_INGEST_BBOX=-88.2,34.9,-81.6,36.7   # Tennessee-ish default inside the script
+make ingest-live-once
+```
+
+- Refuses bbox spans larger than **`LIVE_INGEST_MAX_SPAN_DEG`** (default **14°**) unless **`LIVE_INGEST_ALLOW_LARGE_BBOX=1`**.
+- Prints bbox sources **without secrets**, then runs producers → normalize → compute-risk → quality-check → materialize → console send (override notifier via env).
+
+**Operational cycle**
+
+```bash
+# Fixture/no-secrets path (default): replay producers only, then batch jobs + alerts
+make operational-cycle LIVE_MODE=0 ALERT_NOTIFIER=console
+
+# Live bounded path (requires FIRMS_MAP_KEY + acceptable bbox)
+make operational-cycle LIVE_MODE=1
+```
+
+`LIVE_MODE=0` defaults `ALERTS_WARN_ONLY=1` for downstream tooling consistency (the cycle itself runs quality-check + alert materialization rather than `alerts-check`).
+
+**Runbooks**
+
+- Human procedures live under `docs/runbooks/` and are mapped from `alert_type` via `config/runbooks.yaml` into `alert_events.runbook_slug`.
+
 ### Materialized views (optional performance)
 
 - **`analytics.mv_latest_smoke_risk_by_{county,tract}`** and **`analytics.mv_latest_smoke_risk_{county,tract}_geojson`** mirror the latest/geo views with **unique indexes** for `REFRESH MATERIALIZED VIEW CONCURRENTLY`.
@@ -218,6 +277,10 @@ This wipes the Postgres volume, recreates topics, re-downloads Census data for t
 | `make grafana-up`     | Start Grafana (`--profile grafana`)              |
 | `make refresh-mviews` | `REFRESH MATERIALIZED VIEW CONCURRENTLY` snapshots |
 | `make alerts-check`   | Print alert candidates; fail on **critical**    |
+| `make alerts-materialize` | Upsert `analytics.alert_events` from candidates |
+| `make alerts-send`    | Dispatch notifier for open incidents             |
+| `make ingest-live-once` | Bounded live producers + pipeline + alerts    |
+| `make operational-cycle` | Fixture replay **or** live ingest + batch jobs |
 | `make demo`           | No-secrets local demo (`replay-fixtures` path)   |
 | `make smoke-test`   | Run `scripts/smoke_test.sh`                      |
 | `make test`     | Run pytest                                           |
@@ -315,12 +378,15 @@ Run **`SMOKE_RISK_MODEL_VERSION=v1`** to compare against v2 on the same window.
 - **OpenAQ parameter IDs** can evolve; defaults are configured in `config/sources.yaml`.
 - **Spark jobs are batch** (`earliest` → `latest` offsets per run), not a continuously committed streaming deployment.
 - **Risk inputs** require sufficient recent normalized rows; the smoke test explicitly validates the risk job **runs even when the window is empty**.
+- **`make operational-cycle`**: runs Spark normalization + risk jobs — expect **minutes** locally; `scripts/smoke_test.sh` sanity-checks the shell entrypoints via `bash -n` while pytest covers notifier/bbox helpers without rerunning the full Compose loop every time.
+- **Notifier secrets**: never log `SMTP_PASSWORD`, webhook URLs, or API keys — failures must redact URLs to host-only where practical.
 
 ## Next steps
 
 - Expand census bootstrap to multi-state or national coverage with partitioned loading.
 - Replace batch Kafka reads with committed Structured Streaming + DLQ discipline.
 - Add Great Expectations / data quality gates on raw vs normalized row counts.
+- Wire alert persistence into external incident systems (PagerDuty/Opsgenie) with acknowledgement loops.
 - Calibrate scoring using labeled smoke/air-quality events (still not a clinical model).
 
 ## License

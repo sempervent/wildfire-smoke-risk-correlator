@@ -13,6 +13,9 @@ This repository is a **local-first vertical slice** for correlating NASA FIRMS h
 - **No local default should pull all US tracts.** Multi-state tract downloads are explicit (`CENSUS_STATEFPS`, yaml `states:`); national tract imports are out of scope for the default workflow.
 - **Alerts are SQL-first.** Ship inspectable views/functions (`analytics.fn_alert_candidates`, `v_sli_*`) before wiring external notification systems.
 - **Fixture demo path stays no-secrets:** `make demo` / `make replay-fixtures` must never require `FIRMS_MAP_KEY` or `OPENAQ_API_KEY`.
+- **Phase 4 alerting:** `analytics.alert_events` is a **materialized incident queue** with fingerprint dedupe while `open|acknowledged`; canonical evaluation remains SQL (`fn_alert_candidates`). Notifiers must **never log secrets** (SMTP passwords, webhook URLs with tokens, API keys).
+- **Live ingestion stays bounded by default:** `make ingest-live-once` / `LIVE_INGEST_BBOX` enforce modest spans unless operators set **`LIVE_INGEST_ALLOW_LARGE_BBOX=1`** explicitly.
+- **New alert types require runbooks:** add `docs/runbooks/*.md` **and** extend `config/runbooks.yaml` when introducing a new `alert_type` from SQL.
 
 ## Operating constraints
 
@@ -33,6 +36,7 @@ This repository is a **local-first vertical slice** for correlating NASA FIRMS h
 - **Quality / replay**: `scripts/quality_check.sh`, `scripts/replay_fixtures.sh`
 - **Grafana**: `docker/grafana/provisioning/`, `docker/grafana/dashboards/`
 - **Maps / SLIs (Phase 3)**: `sql/views/zzz_phase3_*.sql`, `scripts/check_alerts.sh`, `scripts/refresh_materialized_views.sh`, `scripts/demo_local.sh`, `src/wildfire_smoke/census_config.py`, `src/wildfire_smoke/alert_thresholds.py`
+- **Alert persistence / notifications (Phase 4)**: `sql/migrations/003_phase4_alerts.sql`, `docker/postgres/initdb/50_phase4.sql`, `src/wildfire_smoke/alerts.py`, `src/wildfire_smoke/notifiers/`, `src/wildfire_smoke/severity.py`, `src/wildfire_smoke/live_bbox.py`, `scripts/materialize_alerts.sh`, `scripts/send_alerts.sh`, `scripts/live_ingest_once.sh`, `scripts/run_operational_cycle.sh`, `config/runbooks.yaml`, `docs/runbooks/`
 
 ## Spark + Python imports
 
