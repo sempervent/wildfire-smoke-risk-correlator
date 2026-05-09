@@ -33,7 +33,14 @@ def stable_fingerprint_details(alert_type: str, details: dict[str, Any]) -> dict
         }
     if alert_type in {"no_recent_fire_detections", "no_recent_air_quality"}:
         return {}
-    if alert_type in {"stale_firms_normalized", "stale_openaq_normalized"}:
+    if alert_type in {"stale_firms_normalized", "stale_openaq_normalized", "wind_data_stale"}:
+        return {}
+    if alert_type == "high_plume_exposure":
+        return {
+            "model_version": details.get("model_version"),
+            "max_exposure_score": details.get("max_exposure_score"),
+        }
+    if alert_type in {"no_recent_wind_data"}:
         return {}
     return {}
 
@@ -48,7 +55,7 @@ def fingerprint_for_candidate(
     details: dict[str, Any],
 ) -> str:
     severity_norm = normalize_db_severity(alert_type, raw_severity)
-    title_key = "" if alert_type == "high_smoke_risk" else title
+    title_key = "" if alert_type in {"high_smoke_risk", "high_plume_exposure"} else title
     payload = {
         "alert_type": alert_type,
         "severity": severity_norm,
@@ -67,13 +74,14 @@ def fetch_candidates(conn: psycopg.Connection) -> list[tuple[Any, ...]]:
         cur.execute(
             """
             SELECT alert_type, severity, geography_type, geoid, title, description, observed_at, details
-            FROM analytics.fn_alert_candidates(%s, %s, %s::double precision, %s)
+            FROM analytics.fn_alert_candidates(%s, %s, %s::double precision, %s, %s::double precision)
             """,
             (
                 thr.freshness_warn_hours,
                 thr.freshness_critical_hours,
                 thr.high_risk_min_score,
                 thr.lookback_hours,
+                thr.high_plume_exposure_min_score,
             ),
         )
         return list(cur.fetchall())

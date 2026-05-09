@@ -10,12 +10,14 @@ def test_alert_threshold_defaults(monkeypatch) -> None:
     monkeypatch.delenv("ALERT_FRESHNESS_CRITICAL_HOURS", raising=False)
     monkeypatch.delenv("ALERT_HIGH_RISK_MIN_SCORE", raising=False)
     monkeypatch.delenv("ALERT_LOOKBACK_HOURS", raising=False)
+    monkeypatch.delenv("ALERT_HIGH_PLUME_EXPOSURE_MIN_SCORE", raising=False)
 
     t = alert_thresholds_from_env()
     assert t.freshness_warn_hours == 6
     assert t.freshness_critical_hours == 24
     assert t.high_risk_min_score == 75.0
     assert t.lookback_hours == 24
+    assert t.high_plume_exposure_min_score == 70.0
 
 
 def test_alert_threshold_overrides(monkeypatch) -> None:

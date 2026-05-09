@@ -18,3 +18,12 @@ mappings:
   high_smoke_risk:
     slug: high-smoke-risk
     path: docs/runbooks/high-smoke-risk.md
+  high_plume_exposure:
+    slug: high-plume-exposure
+    path: docs/runbooks/high-plume-exposure.md
+  wind_data_stale:
+    slug: stale-wind-source
+    path: docs/runbooks/stale-wind-source.md
+  no_recent_wind_data:
+    slug: no-recent-wind-data
+    path: docs/runbooks/no-recent-wind-data.md

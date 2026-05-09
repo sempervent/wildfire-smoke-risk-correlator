@@ -30,6 +30,7 @@ class AlertThresholds:
     freshness_critical_hours: int
     high_risk_min_score: float
     lookback_hours: int
+    high_plume_exposure_min_score: float
 
 
 def alert_thresholds_from_env() -> AlertThresholds:
@@ -38,4 +39,5 @@ def alert_thresholds_from_env() -> AlertThresholds:
         freshness_critical_hours=_positive_int(os.environ.get("ALERT_FRESHNESS_CRITICAL_HOURS"), 24),
         high_risk_min_score=_positive_float(os.environ.get("ALERT_HIGH_RISK_MIN_SCORE"), 75.0),
         lookback_hours=_positive_int(os.environ.get("ALERT_LOOKBACK_HOURS"), 24),
+        high_plume_exposure_min_score=_positive_float(os.environ.get("ALERT_HIGH_PLUME_EXPOSURE_MIN_SCORE"), 70.0),
     )

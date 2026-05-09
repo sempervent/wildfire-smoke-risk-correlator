@@ -13,7 +13,7 @@ def normalize_db_severity(alert_type: str, raw: str) -> str:
     if r == "critical":
         return "critical"
     if r == "warn":
-        if alert_type == "high_smoke_risk":
+        if alert_type in {"high_smoke_risk", "high_plume_exposure"}:
             return "high"
         return "warning"
     if r in _RANK:
