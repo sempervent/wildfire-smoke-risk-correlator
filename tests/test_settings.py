@@ -1,0 +1,41 @@
+from __future__ import annotations
+
+from wildfire_smoke.settings import Settings, kafka_topics
+
+
+def test_kafka_topics_include_expected_keys() -> None:
+    topics = kafka_topics()
+    assert topics["firms_raw_topic"] == "firms.hotspots.raw"
+    assert topics["openaq_raw_topic"] == "openaq.measurements.raw"
+    assert topics["smoke_risk_topic"] == "smoke.risk.scores"
+
+
+def test_settings_env_overrides(monkeypatch) -> None:
+    monkeypatch.setenv("POSTGRES_DB", "custom_db")
+    monkeypatch.setenv("FIRMS_SOURCE", "TEST_SOURCE")
+    monkeypatch.setenv("FIRMS_DRY_RUN", "true")
+
+    s = Settings.from_env()
+    assert s.postgres_db == "custom_db"
+    assert s.firms_source == "TEST_SOURCE"
+    assert s.firms_dry_run is True
+
+    # Secrets must exist as attributes but must never be required for dry-run FIRMS path.
+    monkeypatch.delenv("FIRMS_MAP_KEY", raising=False)
+    s2 = Settings.from_env()
+    assert s2.firms_map_key is None
+
+
+def test_settings_requires_key_for_live_firms(monkeypatch) -> None:
+    monkeypatch.delenv("FIRMS_MAP_KEY", raising=False)
+    monkeypatch.setenv("FIRMS_DRY_RUN", "0")
+
+    from wildfire_smoke.producers import firms_producer as fp
+
+    # firms_producer.main should fail fast without a map key.
+    try:
+        fp.main()
+    except RuntimeError as exc:
+        assert "FIRMS_MAP_KEY" in str(exc)
+    else:
+        raise AssertionError("expected RuntimeError")
