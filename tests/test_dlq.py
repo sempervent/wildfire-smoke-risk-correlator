@@ -82,6 +82,7 @@ def test_replay_from_postgres_dry_run_no_send(monkeypatch: pytest.MonkeyPatch) -
             "firms.hotspots.raw",
             {"record": 1},
             {},
+            "aa" * 32,
         )
     ]
     conn = MagicMock()
@@ -111,7 +112,7 @@ def test_replay_from_postgres_dry_run_no_send(monkeypatch: pytest.MonkeyPatch) -
 
     producer = MagicMock()
     settings = MagicMock()
-    n = rd.replay_from_postgres(
+    scanned, replayed, resolved = rd.replay_from_postgres(
         settings=settings,
         producer=producer,
         dry_run=True,
@@ -119,8 +120,10 @@ def test_replay_from_postgres_dry_run_no_send(monkeypatch: pytest.MonkeyPatch) -
         source_topic_filter=None,
         target_dataset_filter=None,
         status_filter="open",
+        bookkeeping_conn=None,
+        run_id=None,
     )
-    assert n == 1
+    assert (scanned, replayed, resolved) == (1, 0, 0)
     producer.send.assert_not_called()
 
 

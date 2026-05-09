@@ -8,8 +8,10 @@ import logging
 import os
 from datetime import datetime, timezone
 from typing import Any
+from uuid import UUID
 
 from kafka import KafkaConsumer, KafkaProducer
+from psycopg import Connection
 
 from wildfire_smoke.db.connection import connect
 from wildfire_smoke.settings import Settings, kafka_topics
@@ -21,6 +23,93 @@ def _dry_run_default() -> bool:
     return os.environ.get("DRY_RUN", "1").strip().lower() in {"1", "true", "yes"}
 
 
+def _bookkeeping_enabled() -> bool:
+    return os.environ.get("DLQ_REPLAY_BOOKKEEPING", "1").strip().lower() in {"1", "true", "yes"}
+
+
+def _create_replay_run(
+    conn: Connection,
+    *,
+    source: str,
+    dry_run: bool,
+    limit: int,
+    source_topic_filter: str | None,
+    target_dataset_filter: str | None,
+    status_filter: str,
+    mode_extra: dict[str, Any],
+) -> UUID:
+    cfg = {
+        "limit": limit,
+        "source_topic": source_topic_filter,
+        "target_dataset": target_dataset_filter,
+        "status": status_filter,
+        **mode_extra,
+    }
+    with conn.cursor() as cur:
+        cur.execute(
+            """
+            INSERT INTO analytics.dlq_replay_runs (source, status, dry_run, config)
+            VALUES (%s, 'running', %s, %s::jsonb)
+            RETURNING dlq_replay_run_id
+            """,
+            (source, dry_run, json.dumps(cfg, default=str)),
+        )
+        rid = cur.fetchone()[0]
+    conn.commit()
+    return UUID(str(rid))
+
+
+def _finish_replay_run(
+    conn: Connection,
+    run_id: UUID,
+    *,
+    status: str,
+    scanned: int,
+    replayed: int,
+    resolved: int,
+    error_message: str | None,
+) -> None:
+    with conn.cursor() as cur:
+        cur.execute(
+            """
+            UPDATE analytics.dlq_replay_runs
+            SET status = %s,
+                finished_at = now(),
+                records_scanned = %s,
+                records_replayed = %s,
+                records_resolved = %s,
+                error_message = %s
+            WHERE dlq_replay_run_id = %s
+            """,
+            (status, scanned, replayed, resolved, error_message, run_id),
+        )
+    conn.commit()
+
+
+def _insert_item(
+    conn: Connection,
+    *,
+    run_id: UUID,
+    parse_error_id: UUID | None,
+    source_topic: str | None,
+    target_topic: str | None,
+    payload_hash: str | None,
+    status: str,
+    error_message: str | None = None,
+) -> None:
+    with conn.cursor() as cur:
+        cur.execute(
+            """
+            INSERT INTO analytics.dlq_replay_items (
+              dlq_replay_run_id, parse_error_id, source_topic, target_topic,
+              payload_hash, status, error_message
+            ) VALUES (%s, %s, %s, %s, %s, %s, %s)
+            """,
+            (str(run_id), str(parse_error_id) if parse_error_id else None, source_topic, target_topic, payload_hash, status, error_message),
+        )
+    conn.commit()
+
+
 def replay_from_postgres(
     *,
     settings: Settings,
@@ -30,11 +119,13 @@ def replay_from_postgres(
     source_topic_filter: str | None,
     target_dataset_filter: str | None,
     status_filter: str,
-) -> int:
-    """Republish ``payload_sample`` as raw message value (best-effort; may be truncated)."""
+    bookkeeping_conn: Connection | None,
+    run_id: UUID | None,
+) -> tuple[int, int, int]:
+    """Returns (scanned, replayed, resolved)."""
 
     q = """
-        SELECT parse_error_id, source_topic, payload_sample, error_context
+        SELECT parse_error_id, source_topic, payload_sample, error_context, payload_hash
         FROM analytics.parse_errors
         WHERE status = %s::text
           AND (%s::text IS NULL OR source_topic = %s::text)
@@ -43,7 +134,10 @@ def replay_from_postgres(
         LIMIT %s
         """
     resolve = os.environ.get("DLQ_RESOLVE_ON_REPLAY", "0").strip().lower() in {"1", "true", "yes"}
-    count = 0
+    scanned = 0
+    replayed = 0
+    resolved = 0
+
     with connect(settings) as conn:
         with conn.cursor() as cur:
             cur.execute(
@@ -58,12 +152,26 @@ def replay_from_postgres(
                 ),
             )
             rows = cur.fetchall()
-        for parse_error_id, source_topic, payload_sample, err_ctx in rows:
-            count += 1
+
+        for parse_error_id, source_topic, payload_sample, err_ctx, payload_hash in rows:
+            scanned += 1
+            ph = str(payload_hash) if payload_hash else None
             payload: Any = payload_sample
             if payload is None:
                 log.warning("replay_dlq_missing_payload", extra={"parse_error_id": str(parse_error_id)})
+                if bookkeeping_conn and run_id:
+                    _insert_item(
+                        bookkeeping_conn,
+                        run_id=run_id,
+                        parse_error_id=UUID(str(parse_error_id)),
+                        source_topic=source_topic,
+                        target_topic=source_topic,
+                        payload_hash=ph,
+                        status="skipped",
+                        error_message="missing payload_sample",
+                    )
                 continue
+
             if dry_run:
                 log.info(
                     "replay_dlq_dry_run",
@@ -73,8 +181,47 @@ def replay_from_postgres(
                         "payload_preview": str(payload)[:500],
                     },
                 )
+                if bookkeeping_conn and run_id:
+                    _insert_item(
+                        bookkeeping_conn,
+                        run_id=run_id,
+                        parse_error_id=UUID(str(parse_error_id)),
+                        source_topic=source_topic,
+                        target_topic=source_topic,
+                        payload_hash=ph,
+                        status="skipped",
+                        error_message="dry_run",
+                    )
                 continue
-            producer.send(source_topic, value=payload)
+
+            try:
+                producer.send(source_topic, value=payload)
+                replayed += 1
+                if bookkeeping_conn and run_id:
+                    _insert_item(
+                        bookkeeping_conn,
+                        run_id=run_id,
+                        parse_error_id=UUID(str(parse_error_id)),
+                        source_topic=source_topic,
+                        target_topic=source_topic,
+                        payload_hash=ph,
+                        status="replayed",
+                    )
+            except Exception as exc:  # noqa: BLE001
+                log.warning("replay_dlq_publish_failed", extra={"error": str(exc)})
+                if bookkeeping_conn and run_id:
+                    _insert_item(
+                        bookkeeping_conn,
+                        run_id=run_id,
+                        parse_error_id=UUID(str(parse_error_id)),
+                        source_topic=source_topic,
+                        target_topic=source_topic,
+                        payload_hash=ph,
+                        status="failed",
+                        error_message=str(exc)[:800],
+                    )
+                continue
+
             if resolve:
                 with conn.cursor() as cur:
                     meta = dict(err_ctx or {})
@@ -91,9 +238,11 @@ def replay_from_postgres(
                         (json.dumps(meta), parse_error_id),
                     )
                 conn.commit()
+                resolved += 1
+
     if not dry_run:
         producer.flush()
-    return count
+    return scanned, replayed, resolved
 
 
 def replay_from_kafka_dlq(
@@ -104,7 +253,9 @@ def replay_from_kafka_dlq(
     limit: int,
     dlq_topic: str,
     target_dataset_filter: str | None,
-) -> int:
+    bookkeeping_conn: Connection | None,
+    run_id: UUID | None,
+) -> tuple[int, int, int]:
     bootstrap = settings.kafka_bootstrap_servers
     consumer = KafkaConsumer(
         dlq_topic,
@@ -118,6 +269,7 @@ def replay_from_kafka_dlq(
     scanned = 0
     max_scan = max(limit * 200, 500)
     stop = False
+    replayed = 0
     try:
         while processed < limit and not stop:
             packs = consumer.poll(timeout_ms=2000)
@@ -136,6 +288,7 @@ def replay_from_kafka_dlq(
                         continue
                     src_topic = env.get("source_topic")
                     original = env.get("original_payload")
+                    ph = env.get("payload_hash")
                     if not src_topic or original is None:
                         log.warning("replay_dlq_kafka_bad_envelope", extra={"offset": msg.offset})
                         continue
@@ -145,8 +298,43 @@ def replay_from_kafka_dlq(
                             "replay_dlq_kafka_dry_run",
                             extra={"source_topic": src_topic, "offset": msg.offset},
                         )
-                    else:
+                        if bookkeeping_conn and run_id:
+                            _insert_item(
+                                bookkeeping_conn,
+                                run_id=run_id,
+                                parse_error_id=None,
+                                source_topic=src_topic,
+                                target_topic=src_topic,
+                                payload_hash=str(ph) if ph else None,
+                                status="skipped",
+                                error_message="dry_run",
+                            )
+                        continue
+                    try:
                         producer.send(src_topic, value=original)
+                        replayed += 1
+                        if bookkeeping_conn and run_id:
+                            _insert_item(
+                                bookkeeping_conn,
+                                run_id=run_id,
+                                parse_error_id=None,
+                                source_topic=src_topic,
+                                target_topic=src_topic,
+                                payload_hash=str(ph) if ph else None,
+                                status="replayed",
+                            )
+                    except Exception as exc:  # noqa: BLE001
+                        if bookkeeping_conn and run_id:
+                            _insert_item(
+                                bookkeeping_conn,
+                                run_id=run_id,
+                                parse_error_id=None,
+                                source_topic=src_topic,
+                                target_topic=src_topic,
+                                payload_hash=str(ph) if ph else None,
+                                status="failed",
+                                error_message=str(exc)[:800],
+                            )
                     if processed >= limit:
                         stop = True
                         break
@@ -156,7 +344,7 @@ def replay_from_kafka_dlq(
         consumer.close()
     if not dry_run:
         producer.flush()
-    return processed
+    return scanned, replayed, 0
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -185,29 +373,88 @@ def main() -> None:
         bootstrap_servers=[s.strip() for s in settings.kafka_bootstrap_servers.split(",") if s.strip()],
         value_serializer=lambda v: json.dumps(v, default=str).encode("utf-8"),
     )
+
+    bk = _bookkeeping_enabled()
+    run_id: UUID | None = None
+
+    def _run_body(bk_conn: Connection | None) -> None:
+        try:
+            if args.source_mode == "kafka":
+                dlq_topic = args.dlq_topic or topics.get("firms_dlq_topic", "firms.hotspots.dlq")
+                scanned, replayed, resolved = replay_from_kafka_dlq(
+                    settings=settings,
+                    producer=producer,
+                    dry_run=dry,
+                    limit=args.limit,
+                    dlq_topic=dlq_topic,
+                    target_dataset_filter=target_ds,
+                    bookkeeping_conn=bk_conn,
+                    run_id=run_id,
+                )
+            else:
+                st_filter = args.source_topic if args.source_topic else None
+                scanned, replayed, resolved = replay_from_postgres(
+                    settings=settings,
+                    producer=producer,
+                    dry_run=dry,
+                    limit=args.limit,
+                    source_topic_filter=st_filter,
+                    target_dataset_filter=target_ds,
+                    status_filter=args.status,
+                    bookkeeping_conn=bk_conn,
+                    run_id=run_id,
+                )
+
+            if bk_conn and run_id:
+                _finish_replay_run(
+                    bk_conn,
+                    run_id,
+                    status="succeeded",
+                    scanned=scanned,
+                    replayed=replayed,
+                    resolved=resolved,
+                    error_message=None,
+                )
+            log.info(
+                "replay_dlq_finished",
+                extra={
+                    "scanned": scanned,
+                    "replayed": replayed,
+                    "resolved": resolved,
+                    "dry_run": dry,
+                    "mode": args.source_mode,
+                    "run_id": str(run_id) if run_id else None,
+                },
+            )
+        except Exception as exc:
+            if bk_conn and run_id:
+                _finish_replay_run(
+                    bk_conn,
+                    run_id,
+                    status="failed",
+                    scanned=0,
+                    replayed=0,
+                    resolved=0,
+                    error_message=str(exc)[:800],
+                )
+            raise
+
     try:
-        if args.source_mode == "kafka":
-            dlq_topic = args.dlq_topic or topics.get("firms_dlq_topic", "firms.hotspots.dlq")
-            n = replay_from_kafka_dlq(
-                settings=settings,
-                producer=producer,
-                dry_run=dry,
-                limit=args.limit,
-                dlq_topic=dlq_topic,
-                target_dataset_filter=target_ds,
-            )
+        if bk:
+            with connect(settings) as bk_conn:
+                run_id = _create_replay_run(
+                    bk_conn,
+                    source=args.source_mode,
+                    dry_run=dry,
+                    limit=args.limit,
+                    source_topic_filter=args.source_topic or os.environ.get("SOURCE_TOPIC"),
+                    target_dataset_filter=target_ds,
+                    status_filter=args.status,
+                    mode_extra={"dlq_topic": args.dlq_topic or None},
+                )
+                _run_body(bk_conn)
         else:
-            st_filter = args.source_topic if args.source_topic else None
-            n = replay_from_postgres(
-                settings=settings,
-                producer=producer,
-                dry_run=dry,
-                limit=args.limit,
-                source_topic_filter=st_filter,
-                target_dataset_filter=target_ds,
-                status_filter=args.status,
-            )
-        log.info("replay_dlq_finished", extra={"replayed": n, "dry_run": dry, "mode": args.source_mode})
+            _run_body(None)
     finally:
         producer.close()
 
