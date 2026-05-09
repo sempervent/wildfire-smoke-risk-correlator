@@ -44,6 +44,11 @@ class Settings:
 
     jdbc_url: str
 
+    smoke_risk_model_version: str
+    smoke_risk_lookback_hours: int
+    smoke_risk_nearby_km: float
+    smoke_risk_geographies: str
+
     @staticmethod
     def from_env() -> "Settings":
         load_dotenv(repo_root() / ".env", override=False)
@@ -77,6 +82,22 @@ class Settings:
             f"jdbc:postgresql://{postgres_host}:{postgres_port}/{postgres_db}",
         )
 
+        smoke_risk_model_version = os.environ.get("SMOKE_RISK_MODEL_VERSION", "v2").strip().lower()
+        if smoke_risk_model_version not in {"v1", "v2"}:
+            raise ValueError("SMOKE_RISK_MODEL_VERSION must be 'v1' or 'v2'")
+
+        smoke_risk_lookback_hours = int(os.environ.get("SMOKE_RISK_LOOKBACK_HOURS", "24"))
+        if smoke_risk_lookback_hours < 1:
+            raise ValueError("SMOKE_RISK_LOOKBACK_HOURS must be >= 1")
+
+        smoke_risk_nearby_km = float(os.environ.get("SMOKE_RISK_NEARBY_KM", "50"))
+        if smoke_risk_nearby_km <= 0:
+            raise ValueError("SMOKE_RISK_NEARBY_KM must be > 0")
+
+        smoke_risk_geographies = os.environ.get("SMOKE_RISK_GEOGRAPHIES", "both").strip().lower()
+        if smoke_risk_geographies not in {"county", "tract", "both"}:
+            raise ValueError("SMOKE_RISK_GEOGRAPHIES must be one of: county, tract, both")
+
         return Settings(
             kafka_bootstrap_servers=kafka_bootstrap_servers,
             postgres_host=postgres_host,
@@ -95,6 +116,10 @@ class Settings:
             openaq_dry_run=openaq_dry_run,
             openaq_fixture_jsonl=openaq_fixture_jsonl,
             jdbc_url=jdbc_url,
+            smoke_risk_model_version=smoke_risk_model_version,
+            smoke_risk_lookback_hours=smoke_risk_lookback_hours,
+            smoke_risk_nearby_km=smoke_risk_nearby_km,
+            smoke_risk_geographies=smoke_risk_geographies,
         )
 
 

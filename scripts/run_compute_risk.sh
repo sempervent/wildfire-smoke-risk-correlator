@@ -6,24 +6,19 @@ cd "${ROOT_DIR}"
 
 COMPOSE="${COMPOSE:-docker compose}"
 
-SPARK_PACKAGES="org.apache.spark:spark-sql-kafka-0-10_2.12:3.5.4,org.postgresql:postgresql:42.7.3"
-
-SPARK_SUBMIT_ENV=(
+COMPUTE_ENV=(
   -e PYTHONPATH=/app/src
   -e PSYCOPG_CONNINFO="host=postgres port=5432 dbname=${POSTGRES_DB:-smoke} user=${POSTGRES_USER:-smoke} password=${POSTGRES_PASSWORD:-smoke}"
   -e KAFKA_BOOTSTRAP_SERVERS=redpanda:9092
-  -e JDBC_URL="jdbc:postgresql://postgres:5432/${POSTGRES_DB:-smoke}"
-  -e JDBC_USER="${POSTGRES_USER:-smoke}"
-  -e JDBC_PASSWORD="${POSTGRES_PASSWORD:-smoke}"
+  -e SMOKE_RISK_MODEL_VERSION="${SMOKE_RISK_MODEL_VERSION:-v2}"
+  -e SMOKE_RISK_LOOKBACK_HOURS="${SMOKE_RISK_LOOKBACK_HOURS:-24}"
+  -e SMOKE_RISK_NEARBY_KM="${SMOKE_RISK_NEARBY_KM:-50}"
+  -e SMOKE_RISK_GEOGRAPHIES="${SMOKE_RISK_GEOGRAPHIES:-both}"
 )
 
-echo "Spark: compute smoke risk..."
+echo "Python: compute smoke risk..."
 ${COMPOSE} exec -T \
-  "${SPARK_SUBMIT_ENV[@]}" \
-  spark-master /opt/spark/bin/spark-submit \
-  --master "${SPARK_MASTER_URL:-spark://spark-master:7077}" \
-  --packages "${SPARK_PACKAGES}" \
-  --conf spark.executorEnv.PYTHONPATH=/app/src \
-  /app/src/wildfire_smoke/spark/compute_smoke_risk.py
+  "${COMPUTE_ENV[@]}" \
+  spark-master python3 /app/src/wildfire_smoke/spark/compute_smoke_risk.py
 
 echo "Risk computation complete."
