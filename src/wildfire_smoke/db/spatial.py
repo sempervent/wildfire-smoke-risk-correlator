@@ -23,6 +23,26 @@ def associate_fire_points(conn: Connection) -> None:
         )
 
 
+def associate_wind_points(conn: Connection) -> None:
+    with conn.cursor() as cur:
+        cur.execute(
+            """
+            UPDATE normalized.wind_observations w
+            SET county_geoid = c.geoid
+            FROM geo.counties c
+            WHERE ST_Intersects(c.geom, w.geom);
+            """
+        )
+        cur.execute(
+            """
+            UPDATE normalized.wind_observations w
+            SET tract_geoid = t.geoid
+            FROM geo.tracts t
+            WHERE ST_Intersects(t.geom, w.geom);
+            """
+        )
+
+
 def associate_air_quality_points(conn: Connection) -> None:
     with conn.cursor() as cur:
         cur.execute(

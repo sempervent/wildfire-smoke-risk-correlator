@@ -21,6 +21,8 @@ openaq:
 kafka:
   firms_raw_topic: "firms.hotspots.raw"
   openaq_raw_topic: "openaq.measurements.raw"
+  wind_raw_topic: "weather.wind.raw"
+  wind_normalized_topic: "weather.wind.normalized"
   fire_normalized_topic: "fire.detections.normalized"
   air_quality_normalized_topic: "air_quality.measurements.normalized"
   smoke_risk_topic: "smoke.risk.scores"

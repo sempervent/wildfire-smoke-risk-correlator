@@ -9,6 +9,8 @@ COMPOSE="${COMPOSE:-docker compose}"
 TOPICS=(
   "firms.hotspots.raw"
   "openaq.measurements.raw"
+  "weather.wind.raw"
+  "weather.wind.normalized"
   "fire.detections.normalized"
   "air_quality.measurements.normalized"
   "smoke.risk.scores"

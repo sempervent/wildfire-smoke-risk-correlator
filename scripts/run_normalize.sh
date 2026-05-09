@@ -36,4 +36,15 @@ ${COMPOSE} exec -T \
   --conf spark.executorEnv.KAFKA_BOOTSTRAP_SERVERS=redpanda:9092 \
   /app/src/wildfire_smoke/spark/normalize_openaq.py
 
+echo "Spark: normalize wind..."
+${COMPOSE} exec -T \
+  "${SPARK_SUBMIT_ENV[@]}" \
+  spark-master /opt/spark/bin/spark-submit \
+  --master "${SPARK_MASTER_URL:-spark://spark-master:7077}" \
+  --packages "${SPARK_PACKAGES}" \
+  --conf spark.executorEnv.PYTHONPATH=/app/src \
+  --conf spark.executorEnv.PSYCOPG_CONNINFO="host=postgres port=5432 dbname=${POSTGRES_DB:-smoke} user=${POSTGRES_USER:-smoke} password=${POSTGRES_PASSWORD:-smoke}" \
+  --conf spark.executorEnv.KAFKA_BOOTSTRAP_SERVERS=redpanda:9092 \
+  /app/src/wildfire_smoke/spark/normalize_wind.py
+
 echo "Normalization complete."
