@@ -1,6 +1,6 @@
 COMPOSE ?= docker compose
 
-.PHONY: up down reset db-bootstrap topics ingest-once ingest-live-once normalize normalize-wind compute-plume smoke-transport-demo smoke-test dlq-smoke-test test deps quality-check replay-fixtures replay-wind-fixtures replay-bad-fixtures replay-dlq parse-errors consumer-offsets grafana-up refresh-mviews alerts-check alerts-materialize alerts-send alerts-send-digest alerts-send-retry operational-cycle operational-scheduler-up demo
+.PHONY: up down reset db-bootstrap topics ingest-once ingest-live-once normalize normalize-wind compute-plume smoke-transport-demo smoke-test dlq-smoke-test test deps quality-check replay-fixtures replay-wind-fixtures replay-bad-fixtures replay-dlq parse-errors parse-errors-compact consumer-offsets collect-lag kafka-lag grafana-up refresh-mviews alerts-check alerts-materialize alerts-send alerts-send-digest alerts-send-retry operational-cycle operational-scheduler-up demo
 
 deps:
 	uv sync --extra dev
@@ -66,6 +66,14 @@ parse-errors:
 
 consumer-offsets:
 	$(COMPOSE) exec -T postgres psql -v ON_ERROR_STOP=1 -U "$${POSTGRES_USER:-smoke}" -d "$${POSTGRES_DB:-smoke}" -c "SELECT * FROM analytics.v_consumer_offset_state;"
+
+collect-lag:
+	bash scripts/collect_kafka_lag.sh
+
+kafka-lag: collect-lag
+
+parse-errors-compact:
+	bash scripts/compact_parse_errors.sh
 
 grafana-up:
 	$(COMPOSE) --profile grafana up -d grafana
