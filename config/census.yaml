@@ -1,0 +1,20 @@
+state:
+  name: "Tennessee"
+  statefp: "47"
+
+years_try:
+  - 2024
+  - 2023
+  - 2025
+
+tiger_base_url: "https://www2.census.gov/geo/tiger/TIGER{year}"
+
+layers:
+  county:
+    path_pattern: "COUNTY/tl_{year}_{statefp}_county.zip"
+  tract:
+    path_pattern: "TRACT/tl_{year}_{statefp}_tract.zip"
+
+validation:
+  min_counties: 90
+  min_tracts: 1000

@@ -1,0 +1,109 @@
+services:
+  postgres:
+    image: postgis/postgis:16-3.4
+    container_name: wf-postgres
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-smoke}
+      POSTGRES_USER: ${POSTGRES_USER:-smoke}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-smoke}
+    ports:
+      - "${POSTGRES_PORT:-5432}:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./docker/postgres/initdb:/docker-entrypoint-initdb.d:ro
+      - ./data/raw/census:/data/census:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-smoke} -d ${POSTGRES_DB:-smoke}"]
+      interval: 5s
+      timeout: 5s
+      retries: 30
+
+  redpanda:
+    image: docker.redpanda.com/redpandadata/redpanda:v24.2.11
+    container_name: wf-redpanda
+    command:
+      - redpanda
+      - start
+      - --smp
+      - "1"
+      - --memory
+      - 1G
+      - --reserve-memory
+      - 0M
+      - --overprovisioned
+      - --kafka-addr
+      - PLAINTEXT://0.0.0.0:9092,OUTSIDE://0.0.0.0:19092
+      - --advertise-kafka-addr
+      - PLAINTEXT://redpanda:9092,OUTSIDE://localhost:19092
+    ports:
+      - "19092:19092"
+      - "9644:9644"
+    healthcheck:
+      test: ["CMD-SHELL", "rpk cluster info --brokers 127.0.0.1:9092 || exit 1"]
+      interval: 10s
+      timeout: 10s
+      retries: 30
+
+  redpanda-console:
+    image: docker.redpanda.com/redpandadata/console:v2.7.2
+    container_name: wf-redpanda-console
+    depends_on:
+      redpanda:
+        condition: service_healthy
+    environment:
+      CONFIG_FILEPATH: /etc/redpanda-console/config.yaml
+    volumes:
+      - ./docker/redpanda-console/config.yaml:/etc/redpanda-console/config.yaml:ro
+    ports:
+      - "8088:8080"
+
+  spark-master:
+    build:
+      context: .
+      dockerfile: docker/spark/Dockerfile
+    image: wildfire-smoke/spark:3.5.4
+    container_name: wf-spark-master
+    command:
+      - /opt/spark/bin/spark-class
+      - org.apache.spark.deploy.master.Master
+      - --host
+      - spark-master
+      - --port
+      - "7077"
+      - --webui-port
+      - "8080"
+    ports:
+      - "7077:7077"
+      # Spark UI (defaults to 8080 in-container). Host 8080 is commonly occupied; publish on 8091 instead.
+      - "8091:8080"
+    volumes:
+      - ./:/app
+    working_dir: /app
+
+  spark-worker:
+    build:
+      context: .
+      dockerfile: docker/spark/Dockerfile
+    image: wildfire-smoke/spark:3.5.4
+    container_name: wf-spark-worker
+    depends_on:
+      - spark-master
+    environment:
+      - SPARK_WORKER_MEMORY=2G
+    command:
+      - /opt/spark/bin/spark-class
+      - org.apache.spark.deploy.worker.Worker
+      - spark://spark-master:7077
+    volumes:
+      - ./:/app
+    working_dir: /app
+
+  gdal-utils:
+    image: ghcr.io/osgeo/gdal:alpine-small-latest
+    container_name: wf-gdal-utils
+    profiles: ["tools"]
+    volumes:
+      - ./data/raw/census:/data/census
+
+volumes:
+  postgres_data:
