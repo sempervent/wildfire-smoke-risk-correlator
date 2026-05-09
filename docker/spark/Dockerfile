@@ -4,6 +4,7 @@ USER root
 RUN apt-get update \
   && apt-get install -y --no-install-recommends python3-pip \
   && python3 -m pip install --no-cache-dir \
+    "httpx>=0.27" \
     "kafka-python-ng>=2.2" \
     "psycopg[binary]>=3.2" \
     "python-dotenv>=1.0" \
