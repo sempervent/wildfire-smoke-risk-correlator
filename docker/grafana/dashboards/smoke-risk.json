@@ -605,17 +605,131 @@
       ],
       "title": "DLQ operational summary",
       "type": "table"
+    },
+    {
+      "datasource": {"type": "postgres", "uid": "smoke_pg"},
+      "fieldConfig": {"defaults": {}, "overrides": []},
+      "gridPos": {"h": 8, "w": 12, "x": 0, "y": 137},
+      "id": 401,
+      "options": {"showHeader": true},
+      "targets": [
+        {
+          "datasource": {"type": "postgres", "uid": "smoke_pg"},
+          "editorMode": "code",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "SELECT topic, partition, low_watermark, high_watermark, depth_observed_at, approx_span_messages FROM analytics.v_kafka_topic_depth ORDER BY topic, partition LIMIT 120;",
+          "refId": "A"
+        }
+      ],
+      "title": "Kafka topic depth (latest watermark)",
+      "type": "table"
+    },
+    {
+      "datasource": {"type": "postgres", "uid": "smoke_pg"},
+      "fieldConfig": {"defaults": {}, "overrides": []},
+      "gridPos": {"h": 8, "w": 12, "x": 12, "y": 137},
+      "id": 402,
+      "options": {"showHeader": true},
+      "targets": [
+        {
+          "datasource": {"type": "postgres", "uid": "smoke_pg"},
+          "editorMode": "code",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "SELECT consumer_group, topic, partition, current_offset, high_watermark, lag, lag_observed_at FROM analytics.v_consumer_lag_latest ORDER BY lag DESC NULLS LAST LIMIT 80;",
+          "refId": "A"
+        }
+      ],
+      "title": "Consumer lag latest",
+      "type": "table"
+    },
+    {
+      "datasource": {"type": "postgres", "uid": "smoke_pg"},
+      "fieldConfig": {"defaults": {}, "overrides": []},
+      "gridPos": {"h": 7, "w": 24, "x": 0, "y": 145},
+      "id": 403,
+      "options": {"showHeader": true},
+      "targets": [
+        {
+          "datasource": {"type": "postgres", "uid": "smoke_pg"},
+          "editorMode": "code",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "SELECT * FROM analytics.v_dlq_topic_depth;",
+          "refId": "A"
+        }
+      ],
+      "title": "DLQ topic depth proxy",
+      "type": "table"
+    },
+    {
+      "datasource": {"type": "postgres", "uid": "smoke_pg"},
+      "fieldConfig": {"defaults": {}, "overrides": []},
+      "gridPos": {"h": 7, "w": 24, "x": 0, "y": 152},
+      "id": 404,
+      "options": {"showHeader": true},
+      "targets": [
+        {
+          "datasource": {"type": "postgres", "uid": "smoke_pg"},
+          "editorMode": "code",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "SELECT * FROM analytics.v_pipeline_lag_summary;",
+          "refId": "A"
+        }
+      ],
+      "title": "Pipeline lag summary",
+      "type": "table"
+    },
+    {
+      "datasource": {"type": "postgres", "uid": "smoke_pg"},
+      "fieldConfig": {"defaults": {}, "overrides": []},
+      "gridPos": {"h": 8, "w": 12, "x": 0, "y": 159},
+      "id": 405,
+      "options": {"showHeader": true},
+      "targets": [
+        {
+          "datasource": {"type": "postgres", "uid": "smoke_pg"},
+          "editorMode": "code",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "SELECT dlq_replay_run_id, source, dry_run, status, started_at, finished_at, records_scanned, records_replayed, records_resolved FROM analytics.v_dlq_replay_runs LIMIT 40;",
+          "refId": "A"
+        }
+      ],
+      "title": "DLQ replay runs",
+      "type": "table"
+    },
+    {
+      "datasource": {"type": "postgres", "uid": "smoke_pg"},
+      "fieldConfig": {"defaults": {}, "overrides": []},
+      "gridPos": {"h": 8, "w": 12, "x": 12, "y": 159},
+      "id": 406,
+      "options": {"showHeader": true},
+      "targets": [
+        {
+          "datasource": {"type": "postgres", "uid": "smoke_pg"},
+          "editorMode": "code",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "SELECT run_source, run_dry_run, status, source_topic, target_topic, created_at, error_message_preview FROM analytics.v_dlq_replay_items_recent LIMIT 80;",
+          "refId": "A"
+        }
+      ],
+      "title": "Recent DLQ replay items",
+      "type": "table"
     }
   ],
   "refresh": "30s",
   "schemaVersion": 39,
-  "tags": ["smoke", "wildfire", "phase3", "phase5", "phase6", "phase7"],
+  "tags": ["smoke", "wildfire", "phase3", "phase5", "phase6", "phase7", "phase8"],
   "templating": {"list": []},
   "time": {"from": "now-7d", "to": "now"},
   "timepicker": {},
   "timezone": "browser",
-  "title": "Wildfire Smoke Risk (Phase 3–7 ops)",
+  "title": "Wildfire Smoke Risk (Phase 3–8 ops)",
   "uid": "wildfire-smoke-phase2",
-  "version": 4,
+  "version": 5,
   "weekStart": ""
 }
