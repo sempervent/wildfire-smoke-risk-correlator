@@ -1,6 +1,6 @@
 COMPOSE ?= docker compose
 
-.PHONY: up down reset db-bootstrap topics ingest-once normalize compute-risk smoke-test test deps
+.PHONY: up down reset db-bootstrap topics ingest-once normalize compute-risk smoke-test test deps quality-check replay-fixtures
 
 deps:
 	uv sync --extra dev
@@ -30,6 +30,12 @@ normalize:
 
 compute-risk:
 	bash scripts/run_compute_risk.sh
+
+quality-check:
+	bash scripts/quality_check.sh
+
+replay-fixtures:
+	bash scripts/replay_fixtures.sh
 
 smoke-test:
 	bash scripts/smoke_test.sh
