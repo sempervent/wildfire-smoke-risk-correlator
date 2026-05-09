@@ -21,4 +21,7 @@ py_mod wildfire_smoke.producers.firms_producer
 echo "Running OpenAQ producer..."
 py_mod wildfire_smoke.producers.openaq_producer
 
+echo "Running wind producer..."
+py_mod wildfire_smoke.producers.wind_producer
+
 echo "Ingestion cycle complete."

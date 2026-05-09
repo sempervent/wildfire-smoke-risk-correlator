@@ -32,6 +32,8 @@ echo "==> Kafka topics exist"
 for t in \
   firms.hotspots.raw \
   openaq.measurements.raw \
+  weather.wind.raw \
+  weather.wind.normalized \
   fire.detections.normalized \
   air_quality.measurements.normalized \
   smoke.risk.scores \
@@ -63,8 +65,19 @@ ${COMPOSE} exec -T postgres psql -v ON_ERROR_STOP=1 -U "${POSTGRES_USER}" -d "${
 ${COMPOSE} exec -T postgres psql -v ON_ERROR_STOP=1 -U "${POSTGRES_USER}" -d "${POSTGRES_DB}" -c "SELECT COUNT(*) FROM analytics.v_alert_candidates;"
 ${COMPOSE} exec -T postgres psql -v ON_ERROR_STOP=1 -U "${POSTGRES_USER}" -d "${POSTGRES_DB}" -c "SELECT COUNT(*) FROM analytics.v_sli_source_freshness;"
 
+echo "==> Plume computation job runs (may insert 0 rows without correlated fires + wind)"
+bash "${ROOT_DIR}/scripts/run_compute_plume.sh"
+
 echo "==> Risk computation job runs (may insert 0 rows if no correlated window data)"
 bash "${ROOT_DIR}/scripts/run_compute_risk.sh"
+
+echo "==> Phase 6 smoke transport views compile / are queryable"
+${COMPOSE} exec -T postgres psql -v ON_ERROR_STOP=1 -U "${POSTGRES_USER}" -d "${POSTGRES_DB}" -c "SELECT COUNT(*) FROM analytics.v_latest_wind_observations;"
+${COMPOSE} exec -T postgres psql -v ON_ERROR_STOP=1 -U "${POSTGRES_USER}" -d "${POSTGRES_DB}" -c "SELECT COUNT(*) FROM analytics.v_latest_wind_observations_geojson;"
+${COMPOSE} exec -T postgres psql -v ON_ERROR_STOP=1 -U "${POSTGRES_USER}" -d "${POSTGRES_DB}" -c "SELECT COUNT(*) FROM analytics.v_latest_smoke_plume_exposures;"
+${COMPOSE} exec -T postgres psql -v ON_ERROR_STOP=1 -U "${POSTGRES_USER}" -d "${POSTGRES_DB}" -c "SELECT COUNT(*) FROM analytics.v_top_plume_exposures;"
+${COMPOSE} exec -T postgres psql -v ON_ERROR_STOP=1 -U "${POSTGRES_USER}" -d "${POSTGRES_DB}" -c "SELECT COUNT(*) FROM analytics.v_latest_smoke_risk_v3;"
+${COMPOSE} exec -T postgres psql -v ON_ERROR_STOP=1 -U "${POSTGRES_USER}" -d "${POSTGRES_DB}" -c "SELECT COUNT(*) FROM analytics.v_smoke_transport_summary;"
 
 echo "==> Phase 4 alert persistence + routing (table + dry-run materialize + console send)"
 ${COMPOSE} exec -T postgres psql -v ON_ERROR_STOP=1 -U "${POSTGRES_USER}" -d "${POSTGRES_DB}" -c \

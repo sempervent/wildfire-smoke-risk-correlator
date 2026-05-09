@@ -8,12 +8,15 @@ This repository is a **local-first vertical slice** for correlating NASA FIRMS h
 - **Dry-run vs live:** `FIRMS_DRY_RUN=1` / `OPENAQ_DRY_RUN=1` force fixture publishing only—no NASA/OpenAQ network calls. Live ingestion requires keys and fails fast when prerequisites are missing.
 - **No-secret logging:** ingestion run **`config` JSONB** must never contain API keys or map keys; producers only record safe operational fields (bbox, sources, fixture paths, YAML limits).
 - **Additive migrations:** ship DDL under `sql/migrations/*.sql`; `scripts/bootstrap_db.sh` applies them before views. Keep `docker/postgres/initdb/` in sync for fresh volumes.
-- **Risk disclaimer:** scores are an **engineering correlation index**, not a public-health advisory—for both **v1** and **v2**.
+- **Risk disclaimer:** scores are an **engineering correlation index**, not a public-health advisory—for **v1**, **v2**, and **v3**.
+- **Meteorological wind convention:** treat **`wind_direction_degrees` as wind FROM** (origin bearing). Modeled smoke transport uses the **downwind / opposite bearing**—preserve this invariant in math and docs (`src/wildfire_smoke/wind.py`).
+- **Plume model honesty:** `wind_v1` / `analytics.smoke_plume_exposures` is a **simple corridor heuristic**, not atmospheric dispersion, CFD, or epidemiology—never imply clinical/air-quality advisory accuracy from these scores alone.
+- **Wind fixtures stay no-secrets:** `WIND_DRY_RUN=1` + checked-in JSONL must remain runnable without API keys; live wind pulls stay **bounded** (`WIND_STATION_IDS`, documented limitations—no “fetch all CONUS stations” defaults).
 - **Network notifier tests:** mock HTTP/SMTP transports—do not rely on live external calls in unit tests.
 - **Dashboard GeoJSON views are presentation-only.** Canonical geometries live in **`geo.counties` / `geo.tracts`** (and point rows in **`normalized.*`**). Do not treat `analytics.v_latest_*_geojson` as authoritative storage.
 - **No local default should pull all US tracts.** Multi-state tract downloads are explicit (`CENSUS_STATEFPS`, yaml `states:`); national tract imports are out of scope for the default workflow.
 - **Alerts are SQL-first.** Ship inspectable views/functions (`analytics.fn_alert_candidates`, `v_sli_*`) before wiring external notification systems.
-- **Fixture demo path stays no-secrets:** `make demo` / `make replay-fixtures` must never require `FIRMS_MAP_KEY` or `OPENAQ_API_KEY`.
+- **Fixture demo path stays no-secrets:** `make demo` / `make replay-fixtures` must never require `FIRMS_MAP_KEY`, `OPENAQ_API_KEY`, or wind secrets (`WIND_DRY_RUN=1` fixture path).
 - **Phase 4 alerting:** `analytics.alert_events` is a **materialized incident queue** with fingerprint dedupe while `open|acknowledged`; canonical evaluation remains SQL (`fn_alert_candidates`). Notifiers must **never log secrets** (SMTP passwords, webhook URLs with tokens, API keys).
 - **Phase 5 reliability:** `analytics.notification_attempts` is the **audit trail**; store **`destination_hash`** + safe error text only—never raw webhook URLs, tokens, or SMTP secrets. All notifier failures must be safe to aggregate in logs/Grafana.
 - **Digest mode:** digests summarize batches but **must not silently hide criticals**—always point operators back to SQL surfaces (`fn_alert_candidates`, `v_open_alert_events`).

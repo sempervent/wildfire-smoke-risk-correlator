@@ -10,14 +10,20 @@ This repository implements a **Kafka + Spark + PostGIS** pipeline that correlate
 
 **Phase 5** adds **`analytics.notification_attempts`** (durable delivery audit with **destination hashes**, safe errors, **retry_after**), **retry/backoff + max attempt caps**, **`make alerts-send-digest`** / **`make alerts-send-retry`**, **`analytics.operational_runs`** instrumentation from **`scripts/run_operational_cycle.sh`**, **operator evidence SQL views** (wired into Grafana tables), an **optional Compose `scheduler` profile** (`operational-scheduler` using **Docker CLI + socket**—treat as advanced), and **systemd unit/timer templates** under `deploy/systemd/`.
 
+**Phase 6** adds **bounded wind observation ingestion** (`weather.wind.raw` → **`normalized.wind_observations`**), a **`wind_v1` corridor plume approximation** into **`analytics.smoke_plume_exposures`** (**not** dispersion modeling), **smoke risk model `v3`** (blends the existing **v2** base score with max plume exposure), **SQL transport views** (`analytics.v_latest_wind_observations*`, `analytics.v_smoke_transport_summary`, …), **Grafana wind/plume panels**, and **alert candidates** `wind_data_stale`, `no_recent_wind_data`, `high_plume_exposure` with runbooks.
+
+Wind direction uses the **meteorological convention** (*wind FROM*); modeled smoke transport uses the **opposite bearing** (see `src/wildfire_smoke/wind.py`).
+
 **Important:** the risk score is a **demonstration / operations correlation index**, not a health advisory model.
 
 ## What this project does
 
 - **Ingest** FIRMS CSV hotspot rows into Kafka (`firms.hotspots.raw`).
 - **Ingest** OpenAQ v3 measurements into Kafka (`openaq.measurements.raw`).
+- **Ingest** wind observations into Kafka (`weather.wind.raw`; fixtures via **`WIND_DRY_RUN=1`**, or bounded **NWS** adapter via **`WIND_STATION_IDS`**).
 - **Normalize** Kafka messages into PostGIS tables (`normalized.*`) using Spark batch jobs, including **spatial association** to `geo.counties` / `geo.tracts`.
-- **Compute** configurable-window risk scores into `analytics.smoke_risk_scores` (models **v1** and **v2**) and publish JSON snapshots to Kafka (`smoke.risk.scores`).
+- **Compute** configurable-window risk scores into `analytics.smoke_risk_scores` (models **v1**, **v2**, and optional **`v3`**) and publish JSON snapshots to Kafka (`smoke.risk.scores`).
+- **Compute** optional **`wind_v1` plume corridor exposures** (`make compute-plume`) for geography-linked smoke-transport visualization (engineering heuristic only).
 - **Bootstrap** county + tract boundaries from Census TIGER/Line (default **Tennessee**; optional **multi-state** or **national county** load via env — see below).
 
 ## Architecture
@@ -36,10 +42,20 @@ flowchart LR
   SO --> PA[normalized.air_quality_measurements]
   SO --> KA[air_quality.measurements.normalized]
 
+  NWS[NWS API optional] --> WP[Wind producer]
+  WP --> KW[weather.wind.raw]
+  KW --> NW[Spark normalize_wind]
+  NW --> PW[normalized.wind_observations]
+  NW --> KW2[weather.wind.normalized]
+
   CEN[Census TIGER/Line] --> PG[(PostGIS geo schema)]
+  PF --> PL[Plume job compute_plume_exposure]
+  PW --> PL
   PF --> SR[Risk job compute_smoke_risk]
   PA --> SR
   PG --> SR
+  PL --> PE[analytics.smoke_plume_exposures]
+  PE --> SR
   SR --> AN[analytics.smoke_risk_scores]
   SR --> KS[smoke.risk.scores]
 ```
@@ -166,7 +182,7 @@ make grafana-up
 ### Alerting / SLIs (SQL-first)
 
 - **Views:** `analytics.v_sli_*` surface ingestion failures, freshness ages, sparse recent rows, and high-risk rows.
-- **Candidates:** `analytics.fn_alert_candidates(warn_h, crit_h, risk_min, lookback_h)` unions actionable rows; `analytics.v_alert_candidates` uses defaults `(6, 24, 75, 24)`.
+- **Candidates:** `analytics.fn_alert_candidates(warn_h, crit_h, risk_min, lookback_h, high_plume_min)` unions actionable rows; `analytics.v_alert_candidates` uses defaults `(6, 24, 75, 24, 70)` for the last parameter (override via env in `scripts/check_alerts.sh`).
 - **CLI:** `make alerts-check` prints candidates and exits **2** if any **`severity = critical`** exists. Set **`ALERTS_WARN_ONLY=1`** to always exit 0 (recommended for fixture demos where timestamps are intentionally stale).
 - **Threshold env:** `ALERT_FRESHNESS_WARN_HOURS` (default 6), `ALERT_FRESHNESS_CRITICAL_HOURS` (24), `ALERT_HIGH_RISK_MIN_SCORE` (75), `ALERT_LOOKBACK_HOURS` (24).
 
@@ -292,7 +308,7 @@ Row counts per state are printed after load (`GROUP BY statefp`). Scripts remain
 make demo
 ```
 
-Runs `up`, `db-bootstrap`, `topics`, `replay-fixtures`, `normalize`, `compute-risk`, `quality-check`, optional `refresh-mviews` (`DEMO_REFRESH_MVIEWS=0` to skip), then prints **Grafana / Console / Spark / psql** hints. Uses **`FIRMS_DRY_RUN` / `OPENAQ_DRY_RUN`** inside `replay-fixtures`; never requires live keys.
+Runs `up`, `db-bootstrap`, `topics`, `replay-fixtures`, `normalize`, `compute-plume`, `compute-risk`, `quality-check`, optional `refresh-mviews` (`DEMO_REFRESH_MVIEWS=0` to skip), then prints **Grafana / Console / Spark / psql** hints. Uses **`FIRMS_DRY_RUN` / `OPENAQ_DRY_RUN` / `WIND_DRY_RUN`** inside `replay-fixtures`; never requires live keys.
 
 ### Reset everything (destructive)
 
@@ -312,10 +328,14 @@ This wipes the Postgres volume, recreates topics, re-downloads Census data for t
 | `make reset`    | Full local wipe + rebuild + census bootstrap         |
 | `make topics`   | Create required Kafka topics                         |
 | `make db-bootstrap` | Download/load Census + apply SQL views         |
-| `make ingest-once`  | Run FIRMS + OpenAQ producers once                  |
-| `make normalize`    | Run Spark normalization jobs                     |
+| `make ingest-once`  | Run FIRMS + OpenAQ + wind producers once           |
+| `make normalize`    | Run Spark normalization jobs (FIRMS + OpenAQ + wind) |
+| `make normalize-wind` | Spark-normalize **`weather.wind.raw`** only       |
+| `make compute-plume` | **`wind_v1` corridor exposures** (PostGIS job)    |
 | `make compute-risk`   | Run Python smoke-risk job (in Spark container)   |
-| `make replay-fixtures`| Fixture-only Kafka publish + normalize + risk      |
+| `make replay-fixtures`| Fixture Kafka publish + normalize + plume + risk |
+| `make replay-wind-fixtures` | Publish **`WIND_DRY_RUN`** wind fixture + normalize-wind |
+| `make smoke-transport-demo` | Replay fixtures + optional **`SMOKE_RISK_MODEL_VERSION=v3`** risk pass |
 | `make quality-check`  | DB / geometry / duplicate-ID structural checks   |
 | `make grafana-up`     | Start Grafana (`--profile grafana`)              |
 | `make refresh-mviews` | `REFRESH MATERIALIZED VIEW CONCURRENTLY` snapshots |
@@ -360,6 +380,7 @@ Stable analytics views for dashboards include:
 - `analytics.v_ingestion_run_status`, `analytics.v_source_freshness`
 - `analytics.v_data_quality_summary`
 - **Phase 3 maps:** `analytics.v_latest_smoke_risk_county_geojson`, `analytics.v_latest_smoke_risk_tract_geojson`, `analytics.v_latest_fire_detections_geojson`, `analytics.v_latest_air_quality_geojson`
+- **Phase 6 transport:** `analytics.v_latest_wind_observations`, `analytics.v_latest_wind_observations_geojson`, `analytics.v_latest_smoke_plume_exposures`, `analytics.v_top_plume_exposures`, `analytics.v_latest_smoke_risk_v3`, `analytics.v_smoke_transport_summary`
 - **Phase 3 SLIs / alerts:** `analytics.v_sli_*`, `analytics.v_alert_candidates`, `analytics.fn_alert_candidates(...)`
 
 Producer runs append rows to **`analytics.ingestion_runs`** (`run_id`, `source`, `mode` `live|dry_run`, counts, `config` JSON without secrets, `error_message` on failure).
@@ -405,7 +426,16 @@ risk\_score = 100 \cdot (
 
 Recency maps hours since the newest contributing fire to \(1.0 / 0.75 / 0.50 / 0.25 / 0\) at 3h / 6h / 12h / 24h thresholds. Each v2 row stores an **`explanation` JSONB** with inputs, per-component values, weights, and `hours_since_newest_fire`.
 
-Run **`SMOKE_RISK_MODEL_VERSION=v1`** to compare against v2 on the same window.
+### Model v3 (plume-aware blend)
+
+Computes the **same spatial/AQ inputs as v2**, then blends in **`wind_v1` plume exposure** (max score per geography/window from **`analytics.smoke_plume_exposures`**):
+
+\[
+plume\_{component} = \min\left(1,\frac{max\_{plume}}{100}\right),\quad
+risk\_{score} = \min\left(100,\ 0.75\, base\_{v2} + 25\, plume\_{component}\right)
+\]
+
+Run **`SMOKE_RISK_MODEL_VERSION=v1`** or **`=v3`** to compare models on the same clock-aligned window (compute **`make compute-plume`** first so v3’s plume signal is populated when fires/wind align).
 
 ## Troubleshooting
 
@@ -417,6 +447,9 @@ Run **`SMOKE_RISK_MODEL_VERSION=v1`** to compare against v2 on the same window.
 
 ## Known limitations
 
+- **Wind live adapter**: bounding-box station discovery is **not implemented** in v1 — set **`WIND_STATION_IDS`** (comma-separated ICAO ids) for live NWS pulls; respect NWS **`User-Agent`** guidance via **`NWS_USER_AGENT`**.
+- **`wind_v1` plume rows** require overlapping **fire detections**, **wind directions**, and census geometries — fixture demos may legitimately yield **zero** `analytics.smoke_plume_exposures` rows if timestamps/geometries do not intersect.
+- **Alert overlap**: an empty wind table can surface **both** `wind_data_stale` and `no_recent_wind_data`—similar to the FIRMS/OpenAQ freshness/no-row pairing.
 - **Grafana polygon provisioning**: centroid marker maps are the supported default; full GeoJSON polygon styling may require manual panel tuning beyond checked-in JSON.
 - **`make alerts-check` with fixtures**: checked-in FIRMS/OpenAQ timestamps are often outside freshness windows — expect **critical** staleness rows unless you widen thresholds or set **`ALERTS_WARN_ONLY=1`**.
 - **National counties**: `CENSUS_LOAD_NATIONAL_COUNTIES=1` downloads and loads **all** US counties — intentionally heavy; not the default.
