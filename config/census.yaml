@@ -1,6 +1,20 @@
+# Default bootstrap geography: Tennessee (single state, tract + county load).
+# Override with environment:
+#   CENSUS_STATEFP=47                — single FIPS (zero-padded optional)
+#   CENSUS_STATEFPS=47,37,21         — multiple states (tract per state; counties from national zip filtered to these states unless CENSUS_LOAD_NATIONAL_COUNTIES=1)
+#   CENSUS_LOAD_NATIONAL_COUNTIES=1 — load ALL US counties (large); tracts still limited to selected states from yaml/env.
+
 state:
   name: "Tennessee"
   statefp: "47"
+
+# Optional explicit multi-state list (used when CENSUS_STATEFPS / CENSUS_STATEFP are unset).
+# Example:
+# states:
+#   - statefp: "47"
+#     name: "Tennessee"
+#   - statefp: "37"
+#     name: "North Carolina"
 
 years_try:
   - 2024
@@ -18,3 +32,11 @@ layers:
 validation:
   min_counties: 90
   min_tracts: 1000
+  # Multi-state floors (when more than one state is selected); totals must exceed these.
+  min_counties_per_state_floor: 75
+  min_tracts_per_state_floor: 800
+  # Optional explicit overrides when loading multiple states:
+  # min_total_counties_multi_state: 200
+  # min_total_tracts_multi_state: 5000
+  # When CENSUS_LOAD_NATIONAL_COUNTIES=1:
+  min_counties_national_us: 3100
