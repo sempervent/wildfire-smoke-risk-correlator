@@ -31,6 +31,10 @@ class SlackWebhookNotifier(Notifier):
             raise RuntimeError("SLACK_WEBHOOK_URL is required for slack notifier")
         self._url = str(url).strip()
 
+    @property
+    def url(self) -> str:
+        return self._url
+
     def send(self, alerts: list[AlertEventRow]) -> None:
         # Include machine-readable blocks inside attachment footer for debugging without secrets.
         payload = build_slack_payload(alerts)

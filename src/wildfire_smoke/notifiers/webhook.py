@@ -34,6 +34,10 @@ class WebhookNotifier(Notifier):
             raise RuntimeError("ALERT_WEBHOOK_URL is required for webhook notifier")
         self._url = str(url).strip()
 
+    @property
+    def url(self) -> str:
+        return self._url
+
     def send(self, alerts: list[AlertEventRow]) -> None:
         payload = {"alerts": [_safe_alert_payload(a) for a in alerts]}
         body = json.dumps(payload, default=str).encode("utf-8")

@@ -1,6 +1,6 @@
 COMPOSE ?= docker compose
 
-.PHONY: up down reset db-bootstrap topics ingest-once ingest-live-once normalize compute-risk smoke-test test deps quality-check replay-fixtures grafana-up refresh-mviews alerts-check alerts-materialize alerts-send operational-cycle demo
+.PHONY: up down reset db-bootstrap topics ingest-once ingest-live-once normalize compute-risk smoke-test test deps quality-check replay-fixtures grafana-up refresh-mviews alerts-check alerts-materialize alerts-send alerts-send-digest alerts-send-retry operational-cycle operational-scheduler-up demo
 
 deps:
 	uv sync --extra dev
@@ -55,8 +55,17 @@ alerts-materialize:
 alerts-send:
 	bash scripts/send_alerts.sh
 
+alerts-send-digest:
+	ALERT_DIGEST=1 bash scripts/send_alerts.sh --digest
+
+alerts-send-retry:
+	ALERT_RETRY_QUEUE=1 bash scripts/send_alerts.sh --retry-queue
+
 operational-cycle:
 	bash scripts/run_operational_cycle.sh
+
+operational-scheduler-up:
+	$(COMPOSE) --profile scheduler up -d operational-scheduler
 
 demo:
 	bash scripts/demo_local.sh

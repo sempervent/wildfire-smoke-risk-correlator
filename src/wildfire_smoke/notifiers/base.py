@@ -21,6 +21,7 @@ class AlertEventRow:
     first_seen_at: datetime
     last_seen_at: datetime
     details: dict[str, Any]
+    runbook_slug: str | None = None
 
     @staticmethod
     def from_record(row: tuple[Any, ...]) -> AlertEventRow:
@@ -37,6 +38,7 @@ class AlertEventRow:
             first_seen_at,
             last_seen_at,
             details,
+            runbook_slug,
         ) = row
         return AlertEventRow(
             alert_event_id=alert_event_id,
@@ -51,6 +53,7 @@ class AlertEventRow:
             first_seen_at=first_seen_at,
             last_seen_at=last_seen_at,
             details=dict(details or {}),
+            runbook_slug=str(runbook_slug) if runbook_slug is not None else None,
         )
 
 

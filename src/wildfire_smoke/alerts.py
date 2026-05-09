@@ -14,10 +14,10 @@ import psycopg
 from psycopg.types.json import Json
 
 from wildfire_smoke.alert_thresholds import alert_thresholds_from_env
+from wildfire_smoke.alert_delivery import send_notifications_impl
 from wildfire_smoke.db.connection import connect
-from wildfire_smoke.notifiers.base import AlertEventRow
 from wildfire_smoke.runbooks import load_runbook_mappings, runbook_slug_for_alert_type
-from wildfire_smoke.severity import normalize_db_severity, passes_min_severity
+from wildfire_smoke.severity import normalize_db_severity
 from wildfire_smoke.settings import Settings
 
 log = logging.getLogger(__name__)
@@ -228,90 +228,6 @@ def materialize_alerts(*, dry_run: bool, resolve_missing: bool) -> dict[str, int
     return stats
 
 
-def send_notifications() -> dict[str, int]:
-    from wildfire_smoke.notifiers import notifier_from_env
-
-    force = os.environ.get("FORCE_NOTIFY", "0").strip().lower() in {"1", "true", "yes"}
-    min_sev = os.environ.get("ALERT_SEVERITY_MIN", "high").strip().lower()
-    limit = int(os.environ.get("ALERT_LIMIT", "20"))
-    notifier = notifier_from_env()
-    key = notifier.key
-
-    pending: list[AlertEventRow] = []
-    states_by_id: dict[Any, dict[str, Any]] = {}  # keyed by alert_event_id (uuid.UUID)
-    with connect(Settings.from_env()) as conn:
-        with conn.cursor() as cur:
-            cur.execute(
-                """
-                SELECT
-                    alert_event_id,
-                    fingerprint,
-                    alert_type,
-                    severity,
-                    geography_type,
-                    geoid,
-                    title,
-                    description,
-                    observed_at,
-                    first_seen_at,
-                    last_seen_at,
-                    details,
-                    notification_state
-                FROM analytics.alert_events
-                WHERE status = 'open'
-                ORDER BY
-                    CASE severity
-                        WHEN 'critical' THEN 4
-                        WHEN 'high' THEN 3
-                        WHEN 'warning' THEN 2
-                        WHEN 'info' THEN 1
-                        ELSE 0
-                    END DESC,
-                    last_seen_at DESC
-                LIMIT %s
-                """,
-                (limit,),
-            )
-            fetched = cur.fetchall()
-
-        for row in fetched:
-            rec = row[:-1]
-            state = dict(row[-1] or {})
-            ev = AlertEventRow.from_record(rec)
-            if not passes_min_severity(ev.severity, min_sev):
-                continue
-            block = dict(state.get(key) or {})
-            prev = block.get("last_sent_last_seen_at")
-            if not force and prev == ev.last_seen_at.isoformat():
-                continue
-            pending.append(ev)
-            states_by_id[ev.alert_event_id] = state
-
-        if not pending:
-            return {"sent": 0}
-
-        notifier.send(pending)
-
-        with conn.cursor() as cur:
-            for ev in pending:
-                state_dict = dict(states_by_id.get(ev.alert_event_id) or {})
-                block = dict(state_dict.get(key) or {})
-                block["last_sent_last_seen_at"] = ev.last_seen_at.isoformat()
-                state_dict[key] = block
-                cur.execute(
-                    """
-                    UPDATE analytics.alert_events
-                    SET notification_state = %s::jsonb,
-                        updated_at = now()
-                    WHERE alert_event_id = %s
-                    """,
-                    (Json(state_dict), ev.alert_event_id),
-                )
-        conn.commit()
-
-    return {"sent": len(pending)}
-
-
 def cmd_materialize(args: argparse.Namespace) -> int:
     dry = os.environ.get("ALERTS_DRY_RUN", "0").strip().lower() in {"1", "true", "yes"}
     if getattr(args, "dry_run", False):
@@ -324,8 +240,8 @@ def cmd_materialize(args: argparse.Namespace) -> int:
     return 0
 
 
-def cmd_send(_args: argparse.Namespace) -> int:
-    stats = send_notifications()
+def cmd_send(args: argparse.Namespace) -> int:
+    stats = send_notifications_impl(digest=args.digest, retry_queue=args.retry_queue)
     print(json.dumps(stats, default=str))
     return 0
 
@@ -344,6 +260,12 @@ def build_parser() -> argparse.ArgumentParser:
     p_mat.set_defaults(func=cmd_materialize)
 
     p_send = sub.add_parser("send", help="Dispatch notifications for open alert_events")
+    p_send.add_argument("--digest", action="store_true", help="Send one digest (also ALERT_DIGEST=1)")
+    p_send.add_argument(
+        "--retry-queue",
+        action="store_true",
+        help="Only retry alerts whose last notifier attempt failed (also ALERT_RETRY_QUEUE=1)",
+    )
     p_send.set_defaults(func=cmd_send)
 
     return root
