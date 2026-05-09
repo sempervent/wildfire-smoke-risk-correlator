@@ -1,6 +1,6 @@
 COMPOSE ?= docker compose
 
-.PHONY: up down reset db-bootstrap topics ingest-once ingest-live-once normalize normalize-wind compute-plume smoke-transport-demo smoke-test test deps quality-check replay-fixtures replay-wind-fixtures grafana-up refresh-mviews alerts-check alerts-materialize alerts-send alerts-send-digest alerts-send-retry operational-cycle operational-scheduler-up demo
+.PHONY: up down reset db-bootstrap topics ingest-once ingest-live-once normalize normalize-wind compute-plume smoke-transport-demo smoke-test dlq-smoke-test test deps quality-check replay-fixtures replay-wind-fixtures replay-bad-fixtures replay-dlq parse-errors consumer-offsets grafana-up refresh-mviews alerts-check alerts-materialize alerts-send alerts-send-digest alerts-send-retry operational-cycle operational-scheduler-up demo
 
 deps:
 	uv sync --extra dev
@@ -51,6 +51,21 @@ replay-fixtures:
 
 replay-wind-fixtures:
 	bash scripts/replay_wind_fixtures.sh
+
+replay-bad-fixtures:
+	bash scripts/replay_bad_fixtures.sh
+
+replay-dlq:
+	bash scripts/replay_dlq.sh
+
+dlq-smoke-test:
+	bash scripts/dlq_smoke_test.sh
+
+parse-errors:
+	$(COMPOSE) exec -T postgres psql -v ON_ERROR_STOP=1 -U "$${POSTGRES_USER:-smoke}" -d "$${POSTGRES_DB:-smoke}" -c "SELECT * FROM analytics.v_parse_error_summary;"
+
+consumer-offsets:
+	$(COMPOSE) exec -T postgres psql -v ON_ERROR_STOP=1 -U "$${POSTGRES_USER:-smoke}" -d "$${POSTGRES_DB:-smoke}" -c "SELECT * FROM analytics.v_consumer_offset_state;"
 
 grafana-up:
 	$(COMPOSE) --profile grafana up -d grafana

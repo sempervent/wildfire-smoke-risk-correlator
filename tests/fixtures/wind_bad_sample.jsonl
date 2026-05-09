@@ -1,0 +1,2 @@
+{"wind_observation_id":"wo-bad-json-shape","source":"fixture"}
+{"source":"fixture","fetched_at":"2026-01-01T00:00:00Z","record":{"normalized":{"wind_observation_id":"wo-bad-lat","source":"fixture","observed_at":"2026-06-01T18:00:00+00:00","latitude":"not-a-number","longitude":-86.7,"wind_speed_mps":1,"wind_direction_degrees":180,"wind_gust_mps":null}}}
