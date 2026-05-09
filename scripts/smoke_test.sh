@@ -31,9 +31,13 @@ fi
 echo "==> Kafka topics exist"
 for t in \
   firms.hotspots.raw \
+  firms.hotspots.dlq \
   openaq.measurements.raw \
+  openaq.measurements.dlq \
   weather.wind.raw \
+  weather.wind.dlq \
   weather.wind.normalized \
+  normalization.errors \
   fire.detections.normalized \
   air_quality.measurements.normalized \
   smoke.risk.scores \
@@ -50,6 +54,15 @@ uv sync --extra dev >/dev/null
 FIRMS_DRY_RUN=1 OPENAQ_DRY_RUN=1 WIND_DRY_RUN=1 uv run python -m wildfire_smoke.producers.firms_producer
 FIRMS_DRY_RUN=1 OPENAQ_DRY_RUN=1 WIND_DRY_RUN=1 uv run python -m wildfire_smoke.producers.openaq_producer
 FIRMS_DRY_RUN=1 OPENAQ_DRY_RUN=1 WIND_DRY_RUN=1 uv run python -m wildfire_smoke.producers.wind_producer
+
+echo "==> Phase 7 durable parse_errors / offset evidence tables exist"
+${COMPOSE} exec -T postgres psql -v ON_ERROR_STOP=1 -U "${POSTGRES_USER}" -d "${POSTGRES_DB}" -c "SELECT COUNT(*) FROM analytics.parse_errors;"
+${COMPOSE} exec -T postgres psql -v ON_ERROR_STOP=1 -U "${POSTGRES_USER}" -d "${POSTGRES_DB}" -c "SELECT COUNT(*) FROM analytics.kafka_consumer_offsets;"
+
+echo "==> Malformed fixture publisher + DLQ replay dry-run (no API keys)"
+export KAFKA_BOOTSTRAP_SERVERS="${KAFKA_BOOTSTRAP_SERVERS:-localhost:19092}"
+bash "${ROOT_DIR}/scripts/replay_bad_fixtures.sh"
+DRY_RUN=1 bash "${ROOT_DIR}/scripts/replay_dlq.sh"
 
 echo "==> SQL views compile / are queryable"
 ${COMPOSE} exec -T postgres psql -v ON_ERROR_STOP=1 -U "${POSTGRES_USER}" -d "${POSTGRES_DB}" -c "SELECT COUNT(*) FROM analytics.smoke_risk_by_county;"
@@ -80,6 +93,13 @@ ${COMPOSE} exec -T postgres psql -v ON_ERROR_STOP=1 -U "${POSTGRES_USER}" -d "${
 ${COMPOSE} exec -T postgres psql -v ON_ERROR_STOP=1 -U "${POSTGRES_USER}" -d "${POSTGRES_DB}" -c "SELECT COUNT(*) FROM analytics.v_latest_smoke_risk_v3;"
 ${COMPOSE} exec -T postgres psql -v ON_ERROR_STOP=1 -U "${POSTGRES_USER}" -d "${POSTGRES_DB}" -c "SELECT COUNT(*) FROM analytics.v_smoke_transport_summary;"
 
+echo "==> Phase 7 DLQ / parse-error views compile / are queryable"
+${COMPOSE} exec -T postgres psql -v ON_ERROR_STOP=1 -U "${POSTGRES_USER}" -d "${POSTGRES_DB}" -c "SELECT COUNT(*) FROM analytics.v_parse_errors_open;"
+${COMPOSE} exec -T postgres psql -v ON_ERROR_STOP=1 -U "${POSTGRES_USER}" -d "${POSTGRES_DB}" -c "SELECT COUNT(*) FROM analytics.v_parse_error_summary;"
+${COMPOSE} exec -T postgres psql -v ON_ERROR_STOP=1 -U "${POSTGRES_USER}" -d "${POSTGRES_DB}" -c "SELECT COUNT(*) FROM analytics.v_parse_errors_recent;"
+${COMPOSE} exec -T postgres psql -v ON_ERROR_STOP=1 -U "${POSTGRES_USER}" -d "${POSTGRES_DB}" -c "SELECT COUNT(*) FROM analytics.v_consumer_offset_state;"
+${COMPOSE} exec -T postgres psql -v ON_ERROR_STOP=1 -U "${POSTGRES_USER}" -d "${POSTGRES_DB}" -c "SELECT COUNT(*) FROM analytics.v_dlq_operational_summary;"
+
 echo "==> Phase 4 alert persistence + routing (table + dry-run materialize + console send)"
 ${COMPOSE} exec -T postgres psql -v ON_ERROR_STOP=1 -U "${POSTGRES_USER}" -d "${POSTGRES_DB}" -c \
   "SELECT COUNT(*) FROM analytics.alert_events;"
@@ -106,5 +126,10 @@ test -f "${ROOT_DIR}/deploy/systemd/wildfire-smoke-operational.timer"
 
 echo "==> alerts-check (warn-only; fixture data is often stale)"
 ALERTS_WARN_ONLY=1 bash "${ROOT_DIR}/scripts/check_alerts.sh"
+
+if [[ "${DLQ_SMOKE:-0}" == "1" ]]; then
+  echo "==> DLQ_SMOKE=1: full DLQ smoke (replay bad fixtures + normalize + parse_errors assertions)"
+  bash "${ROOT_DIR}/scripts/dlq_smoke_test.sh"
+fi
 
 echo "Smoke test passed."

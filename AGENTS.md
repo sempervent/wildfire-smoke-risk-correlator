@@ -23,6 +23,11 @@ This repository is a **local-first vertical slice** for correlating NASA FIRMS h
 - **Scheduler profile:** Compose `scheduler` is **off by default**; mounting Docker sockets is sensitive—prefer **`deploy/systemd/`** timers on a secured host when possible.
 - **Live ingestion stays bounded by default:** `make ingest-live-once` / `LIVE_INGEST_BBOX` enforce modest spans unless operators set **`LIVE_INGEST_ALLOW_LARGE_BBOX=1`** explicitly.
 - **New alert types require runbooks:** add `docs/runbooks/*.md` **and** extend `config/runbooks.yaml` when introducing a new `alert_type` from SQL.
+- **Phase 7 normalization failures:** **bad Kafka messages must not poison a batch**—quarantine per row into **`analytics.parse_errors`**, publish sanitized envelopes to **source DLQs** + **`normalization.errors`**, and keep writing valid rows. Never insert normalized rows with null required fields just to “move on.”
+- **DLQ replay safety:** operator tooling defaults to **`DRY_RUN=1`** (`scripts/replay_dlq.sh`). Treat **`DLQ_RESOLVE_ON_REPLAY=1`** as explicit acknowledgement when republishing fixed payloads.
+- **No secrets in failure artifacts:** **`payload_sample`**, DLQ **`original_payload`**, and logs must stay free of API keys/tokens—use `wildfire_smoke.dlq.sanitize_payload_sample` patterns.
+- **Parser observability:** classify failures (`error_class`) consistently so **`analytics.parse_errors`** and alerts remain aggregate-friendly.
+- **Offset concepts:** **`analytics.kafka_consumer_offsets`** is **application evidence** from Spark batch jobs; Kafka broker consumer-group commits are a separate mechanism unless explicitly unified in a future phase.
 
 ## Operating constraints
 
@@ -61,6 +66,7 @@ make replay-fixtures
 make normalize && make compute-risk
 make quality-check && make smoke-test
 make alerts-check ALERTS_WARN_ONLY=1
+# Phase 7 deep validation (Spark normalizers + poison messages): make dlq-smoke-test
 make refresh-mviews
 make grafana-up
 ```

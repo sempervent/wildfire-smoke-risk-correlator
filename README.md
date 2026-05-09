@@ -12,6 +12,8 @@ This repository implements a **Kafka + Spark + PostGIS** pipeline that correlate
 
 **Phase 6** adds **bounded wind observation ingestion** (`weather.wind.raw` → **`normalized.wind_observations`**), a **`wind_v1` corridor plume approximation** into **`analytics.smoke_plume_exposures`** (**not** dispersion modeling), **smoke risk model `v3`** (blends the existing **v2** base score with max plume exposure), **SQL transport views** (`analytics.v_latest_wind_observations*`, `analytics.v_smoke_transport_summary`, …), **Grafana wind/plume panels**, and **alert candidates** `wind_data_stale`, `no_recent_wind_data`, `high_plume_exposure` with runbooks.
 
+**Phase 7** adds **durable parse-error quarantine** (`analytics.parse_errors`), **Spark normalizer offset evidence** (`analytics.kafka_consumer_offsets`; distinct from broker-internal committed offsets unless unified later), **source-specific Kafka DLQs** plus a shared **`normalization.errors`** stream, **`make replay-bad-fixtures`** / **`make replay-dlq`** ( **`DRY_RUN=1` default** ), **`make dlq-smoke-test`** (bad fixtures + normalize + assertions), expanded **`make quality-check`** / **`make smoke-test`** hooks, **SQL + Grafana operational views**, and alert candidates **`parse_errors_high`**, **`parser_failure_spike`**, **`dlq_records_present`**, **`consumer_offset_stale`** with runbooks.
+
 Wind direction uses the **meteorological convention** (*wind FROM*); modeled smoke transport uses the **opposite bearing** (see `src/wildfire_smoke/wind.py`).
 
 **Important:** the risk score is a **demonstration / operations correlation index**, not a health advisory model.
@@ -182,9 +184,9 @@ make grafana-up
 ### Alerting / SLIs (SQL-first)
 
 - **Views:** `analytics.v_sli_*` surface ingestion failures, freshness ages, sparse recent rows, and high-risk rows.
-- **Candidates:** `analytics.fn_alert_candidates(warn_h, crit_h, risk_min, lookback_h, high_plume_min)` unions actionable rows; `analytics.v_alert_candidates` uses defaults `(6, 24, 75, 24, 70)` for the last parameter (override via env in `scripts/check_alerts.sh`).
+- **Candidates:** `analytics.fn_alert_candidates(warn_h, crit_h, risk_min, lookback_h, high_plume_min, parse_err_warn, parse_err_crit, offset_stale_h)` unions actionable rows; `analytics.v_alert_candidates` uses defaults `(6, 24, 75, 24, 70, 1, 25, 6)` for the Phase 7 tail (override via env in `scripts/check_alerts.sh`).
 - **CLI:** `make alerts-check` prints candidates and exits **2** if any **`severity = critical`** exists. Set **`ALERTS_WARN_ONLY=1`** to always exit 0 (recommended for fixture demos where timestamps are intentionally stale).
-- **Threshold env:** `ALERT_FRESHNESS_WARN_HOURS` (default 6), `ALERT_FRESHNESS_CRITICAL_HOURS` (24), `ALERT_HIGH_RISK_MIN_SCORE` (75), `ALERT_LOOKBACK_HOURS` (24).
+- **Threshold env:** `ALERT_FRESHNESS_WARN_HOURS` (default 6), `ALERT_FRESHNESS_CRITICAL_HOURS` (24), `ALERT_HIGH_RISK_MIN_SCORE` (75), `ALERT_LOOKBACK_HOURS` (24), `ALERT_HIGH_PLUME_EXPOSURE_MIN_SCORE` (70), `ALERT_PARSE_ERRORS_WARN_COUNT` (1), `ALERT_PARSE_ERRORS_CRITICAL_COUNT` (25), `ALERT_CONSUMER_OFFSET_STALE_HOURS` (6).
 
 ### Phase 4 — persisted alerts, notifications, bounded live ingest
 
@@ -318,6 +320,39 @@ make reset
 
 This wipes the Postgres volume, recreates topics, re-downloads Census data for the configured state/year fallback list, reloads boundaries, and reapplies SQL views.
 
+## Phase 7 — parse errors, DLQs, and replay safety
+
+**Postgres**
+
+- **`analytics.parse_errors`**: one row per logical open failure (`payload_hash` + `error_class` + consumer group + topics), with rolling **`occurrence_count`** and JSONB **`payload_sample`** / **`error_context`** (no secrets; oversized payloads are truncated in helpers under `src/wildfire_smoke/dlq.py`).
+- **`analytics.kafka_consumer_offsets`**: last processed / success / error offsets per **`(consumer_group, topic, partition)`** written by Spark normalizers as **evidence**, not as a replacement for Kafka’s internal consumer group commits.
+
+**Kafka**
+
+- **Per-source DLQs:** `firms.hotspots.dlq`, `openaq.measurements.dlq`, `weather.wind.dlq`.
+- **Fan-in diagnostics:** `normalization.errors` receives the same envelope as the source DLQ (operators can subscribe once for all normalizers).
+
+**Envelope (published JSON)**
+
+- Includes `source_topic`, `target_dataset`, `consumer_group`, `original_key`, `original_partition`, `original_offset`, `payload_hash`, `error_class`, `error_message`, `error_context`, **`original_payload`** (sanitized/truncated), and `failed_at`.
+
+**Workflows**
+
+- **`make replay-bad-fixtures`**: publishes intentionally malformed CSV/JSONL fixtures to raw topics (no API keys).
+- **`make replay-dlq`**: reads **`analytics.parse_errors`** by default (`DLQ_SOURCE_MODE=postgres`) or a DLQ topic (`DLQ_SOURCE_MODE=kafka`); defaults to **`DRY_RUN=1`**. Filter with **`SOURCE_TOPIC`**, **`TARGET_DATASET`**, **`STATUS`**, **`DLQ_REPLAY_LIMIT`**. Optional **`DLQ_RESOLVE_ON_REPLAY=1`** marks replayed Postgres rows **`resolved`** when not dry-running.
+- **`make dlq-smoke-test`**: `replay-bad-fixtures` → full **`make normalize`** → asserts **`parse_errors`** gained rows → dry-run **`replay-dlq`** → compiles Phase 7 views.
+- **`make smoke-test`**: lightweight Phase 7 checks (topics, tables, views, `replay-bad-fixtures`, **`replay-dlq` dry-run`). Set **`DLQ_SMOKE=1`** to chain **`dlq-smoke-test`** after the standard smoke path (slower; exercises Spark on poison messages).
+
+**Quality / alerts**
+
+- **`make quality-check`** fails if Phase 7 tables or DLQ topics are missing; warns on open parse errors, 24h parse-error counts, and missing Spark offset-evidence rows.
+- New alert runbooks live under `docs/runbooks/parse-errors-high.md` (and related filenames); mappings are in `config/runbooks.yaml`.
+
+**Known limitations**
+
+- Postgres replay uses **`payload_sample`** (may be truncated); Kafka DLQ replay uses **`original_payload`** from the envelope when available.
+- **`consumer_offset_stale`** warns when **no** `spark-normalize%` evidence exists yet (common before the first successful normalization on a fresh volume).
+
 ## Makefile targets
 
 | Target          | Purpose                                              |
@@ -335,6 +370,11 @@ This wipes the Postgres volume, recreates topics, re-downloads Census data for t
 | `make compute-risk`   | Run Python smoke-risk job (in Spark container)   |
 | `make replay-fixtures`| Fixture Kafka publish + normalize + plume + risk |
 | `make replay-wind-fixtures` | Publish **`WIND_DRY_RUN`** wind fixture + normalize-wind |
+| `make replay-bad-fixtures` | Publish **malformed** FIRMS/OpenAQ/wind fixtures (no API keys) |
+| `make replay-dlq` | **`scripts/replay_dlq.sh`** — DLQ / `parse_errors` replay (**`DRY_RUN=1` default**) |
+| `make dlq-smoke-test` | Bad fixtures + normalize + assert **`parse_errors`** + dry-run replay |
+| `make parse-errors` | Print **`analytics.v_parse_error_summary`** |
+| `make consumer-offsets` | Print **`analytics.v_consumer_offset_state`** |
 | `make smoke-transport-demo` | Replay fixtures + optional **`SMOKE_RISK_MODEL_VERSION=v3`** risk pass |
 | `make quality-check`  | DB / geometry / duplicate-ID structural checks   |
 | `make grafana-up`     | Start Grafana (`--profile grafana`)              |
@@ -381,6 +421,7 @@ Stable analytics views for dashboards include:
 - `analytics.v_data_quality_summary`
 - **Phase 3 maps:** `analytics.v_latest_smoke_risk_county_geojson`, `analytics.v_latest_smoke_risk_tract_geojson`, `analytics.v_latest_fire_detections_geojson`, `analytics.v_latest_air_quality_geojson`
 - **Phase 6 transport:** `analytics.v_latest_wind_observations`, `analytics.v_latest_wind_observations_geojson`, `analytics.v_latest_smoke_plume_exposures`, `analytics.v_top_plume_exposures`, `analytics.v_latest_smoke_risk_v3`, `analytics.v_smoke_transport_summary`
+- **Phase 7 DLQ / offsets:** `analytics.v_parse_errors_open`, `analytics.v_parse_error_summary`, `analytics.v_parse_errors_recent`, `analytics.v_consumer_offset_state`, `analytics.v_dlq_operational_summary`
 - **Phase 3 SLIs / alerts:** `analytics.v_sli_*`, `analytics.v_alert_candidates`, `analytics.fn_alert_candidates(...)`
 
 Producer runs append rows to **`analytics.ingestion_runs`** (`run_id`, `source`, `mode` `live|dry_run`, counts, `config` JSON without secrets, `error_message` on failure).

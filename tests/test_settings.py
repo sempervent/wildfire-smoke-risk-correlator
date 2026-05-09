@@ -10,6 +10,10 @@ def test_kafka_topics_include_expected_keys() -> None:
     assert topics["firms_raw_topic"] == "firms.hotspots.raw"
     assert topics["openaq_raw_topic"] == "openaq.measurements.raw"
     assert topics["smoke_risk_topic"] == "smoke.risk.scores"
+    assert topics["firms_dlq_topic"] == "firms.hotspots.dlq"
+    assert topics["openaq_dlq_topic"] == "openaq.measurements.dlq"
+    assert topics["wind_dlq_topic"] == "weather.wind.dlq"
+    assert topics["normalization_errors_topic"] == "normalization.errors"
 
 
 def test_settings_env_overrides(monkeypatch) -> None:

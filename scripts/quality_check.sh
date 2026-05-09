@@ -39,6 +39,8 @@ REQUIRED_TABLES=(
   "analytics.smoke_plume_exposures"
   "analytics.smoke_risk_scores"
   "analytics.ingestion_runs"
+  "analytics.parse_errors"
+  "analytics.kafka_consumer_offsets"
 )
 
 for rel in "${REQUIRED_TABLES[@]}"; do
@@ -106,6 +108,35 @@ if [[ "${RISK_LAST}" != "0" ]]; then
   if [[ "${DELTA}" -gt $((STALE_HOURS * 3600)) ]]; then
     warn "Latest smoke_risk_scores.computed_at is older than ${STALE_HOURS}h (seconds_ago=${DELTA})."
   fi
+fi
+
+echo "==> Phase 7 Kafka topics (DLQ + normalization.errors)"
+for t in firms.hotspots.dlq openaq.measurements.dlq weather.wind.dlq normalization.errors; do
+  if ! ${COMPOSE} exec -T redpanda rpk topic describe "${t}" --brokers 127.0.0.1:9092 >/dev/null 2>&1; then
+    fail "Missing Kafka topic ${t} (run make topics)."
+  fi
+done
+
+echo "==> Parse errors / consumer offset evidence (warnings)"
+OPEN_PE="$(psql_exec -At -c "SELECT COUNT(*)::text FROM analytics.parse_errors WHERE status = 'open';")"
+if [[ "${OPEN_PE}" != "0" ]]; then
+  warn "Open parse_errors rows=${OPEN_PE} (inspect analytics.v_parse_errors_open / DLQ topics)."
+fi
+
+PE_24H="$(psql_exec -At -c "SELECT COUNT(*)::text FROM analytics.parse_errors WHERE last_seen_at >= (now() - interval '24 hours');")"
+if [[ "${PE_24H}" != "0" ]]; then
+  warn "Parse_errors touched in last 24h: count=${PE_24H}"
+fi
+
+PE_TOTAL="$(psql_exec -At -c "SELECT COUNT(*)::text FROM analytics.parse_errors;")"
+if [[ "${PE_TOTAL}" != "0" ]]; then
+  PE_AGE_H="$(psql_exec -At -c "SELECT EXTRACT(epoch FROM (now() - MAX(last_seen_at))) / 3600.0 FROM analytics.parse_errors;")"
+  echo "latest_parse_error_age_hours=${PE_AGE_H}"
+fi
+
+OFF_EV="$(psql_exec -At -c "SELECT COUNT(*)::text FROM analytics.kafka_consumer_offsets WHERE consumer_group LIKE 'spark-normalize%';")"
+if [[ "${OFF_EV}" == "0" ]]; then
+  warn "No analytics.kafka_consumer_offsets rows for spark-normalize% yet (expected until normalizers run in this environment)."
 fi
 
 echo "Quality check passed (warnings=${WARNINGS})."
