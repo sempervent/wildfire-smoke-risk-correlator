@@ -64,6 +64,21 @@ step compute_risk start
 bash "${ROOT_DIR}/scripts/run_compute_risk.sh"
 step compute_risk ok
 
+COLLECT_LAG="${COLLECT_LAG:-1}"
+if [[ "${COLLECT_LAG}" == "1" ]]; then
+  echo "==> Collect broker lag evidence (COLLECT_LAG=1)"
+  step collect_lag start
+  if bash "${ROOT_DIR}/scripts/collect_kafka_lag.sh"; then
+    step collect_lag ok
+  else
+    step collect_lag warn
+    if [[ "${STRICT_LAG_COLLECTION:-0}" == "1" ]]; then
+      finish_failed lag_collection_failed
+      exit 2
+    fi
+  fi
+fi
+
 echo "==> Quality check"
 step quality_check start
 bash "${ROOT_DIR}/scripts/quality_check.sh"

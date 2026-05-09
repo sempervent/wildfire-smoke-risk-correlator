@@ -44,6 +44,17 @@ bash "${ROOT_DIR}/scripts/run_compute_plume.sh"
 echo "==> Compute risk"
 bash "${ROOT_DIR}/scripts/run_compute_risk.sh"
 
+COLLECT_LAG="${COLLECT_LAG:-1}"
+if [[ "${COLLECT_LAG}" == "1" ]]; then
+  echo "==> Collect broker lag evidence"
+  bash "${ROOT_DIR}/scripts/collect_kafka_lag.sh" || {
+    if [[ "${STRICT_LAG_COLLECTION:-0}" == "1" ]]; then
+      exit 2
+    fi
+    true
+  }
+fi
+
 echo "==> Quality check"
 bash "${ROOT_DIR}/scripts/quality_check.sh"
 

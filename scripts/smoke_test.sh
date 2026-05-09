@@ -100,6 +100,37 @@ ${COMPOSE} exec -T postgres psql -v ON_ERROR_STOP=1 -U "${POSTGRES_USER}" -d "${
 ${COMPOSE} exec -T postgres psql -v ON_ERROR_STOP=1 -U "${POSTGRES_USER}" -d "${POSTGRES_DB}" -c "SELECT COUNT(*) FROM analytics.v_consumer_offset_state;"
 ${COMPOSE} exec -T postgres psql -v ON_ERROR_STOP=1 -U "${POSTGRES_USER}" -d "${POSTGRES_DB}" -c "SELECT COUNT(*) FROM analytics.v_dlq_operational_summary;"
 
+echo "==> Phase 8 broker lag / replay bookkeeping tables"
+${COMPOSE} exec -T postgres psql -v ON_ERROR_STOP=1 -U "${POSTGRES_USER}" -d "${POSTGRES_DB}" -c "SELECT COUNT(*) FROM analytics.kafka_topic_offsets;"
+${COMPOSE} exec -T postgres psql -v ON_ERROR_STOP=1 -U "${POSTGRES_USER}" -d "${POSTGRES_DB}" -c "SELECT COUNT(*) FROM analytics.kafka_consumer_lag_observations;"
+${COMPOSE} exec -T postgres psql -v ON_ERROR_STOP=1 -U "${POSTGRES_USER}" -d "${POSTGRES_DB}" -c "SELECT COUNT(*) FROM analytics.dlq_replay_runs;"
+
+echo "==> Phase 8 lag / pipeline views compile"
+${COMPOSE} exec -T postgres psql -v ON_ERROR_STOP=1 -U "${POSTGRES_USER}" -d "${POSTGRES_DB}" -c "SELECT COUNT(*) FROM analytics.v_kafka_topic_depth;"
+${COMPOSE} exec -T postgres psql -v ON_ERROR_STOP=1 -U "${POSTGRES_USER}" -d "${POSTGRES_DB}" -c "SELECT COUNT(*) FROM analytics.v_consumer_lag_latest;"
+${COMPOSE} exec -T postgres psql -v ON_ERROR_STOP=1 -U "${POSTGRES_USER}" -d "${POSTGRES_DB}" -c "SELECT COUNT(*) FROM analytics.v_dlq_topic_depth;"
+${COMPOSE} exec -T postgres psql -v ON_ERROR_STOP=1 -U "${POSTGRES_USER}" -d "${POSTGRES_DB}" -c "SELECT COUNT(*) FROM analytics.v_pipeline_lag_summary;"
+${COMPOSE} exec -T postgres psql -v ON_ERROR_STOP=1 -U "${POSTGRES_USER}" -d "${POSTGRES_DB}" -c "SELECT COUNT(*) FROM analytics.v_dlq_replay_runs;"
+${COMPOSE} exec -T postgres psql -v ON_ERROR_STOP=1 -U "${POSTGRES_USER}" -d "${POSTGRES_DB}" -c "SELECT COUNT(*) FROM analytics.v_dlq_replay_items_recent;"
+
+echo "==> collect-lag (best-effort; STRICT_LAG_COLLECTION not set)"
+bash "${ROOT_DIR}/scripts/collect_kafka_lag.sh" || true
+
+echo "==> replay-dlq bookkeeping dry-run creates replay run row when DB available"
+RUNS_BEFORE="$(${COMPOSE} exec -T postgres psql -At -U "${POSTGRES_USER}" -d "${POSTGRES_DB}" -c "SELECT COUNT(*)::bigint FROM analytics.dlq_replay_runs;" | tr -d '[:space:]')"
+DRY_RUN=1 DLQ_REPLAY_BOOKKEEPING=1 bash "${ROOT_DIR}/scripts/replay_dlq.sh" --limit 2 || true
+RUNS_AFTER="$(${COMPOSE} exec -T postgres psql -At -U "${POSTGRES_USER}" -d "${POSTGRES_DB}" -c "SELECT COUNT(*)::bigint FROM analytics.dlq_replay_runs;" | tr -d '[:space:]')"
+if (( RUNS_AFTER <= RUNS_BEFORE )); then
+  echo "WARN: expected dlq_replay_runs to grow after replay-dlq (bookkeeping enabled)." >&2
+fi
+
+echo "==> parse-errors-compact dry-run"
+DRY_RUN=1 bash "${ROOT_DIR}/scripts/compact_parse_errors.sh" || true
+
+test -f "${ROOT_DIR}/docs/runbooks/kafka-lag-high.md"
+test -f "${ROOT_DIR}/docs/runbooks/dlq-depth-high.md"
+test -f "${ROOT_DIR}/docs/runbooks/replay-failures-recent.md"
+
 echo "==> Phase 4 alert persistence + routing (table + dry-run materialize + console send)"
 ${COMPOSE} exec -T postgres psql -v ON_ERROR_STOP=1 -U "${POSTGRES_USER}" -d "${POSTGRES_DB}" -c \
   "SELECT COUNT(*) FROM analytics.alert_events;"

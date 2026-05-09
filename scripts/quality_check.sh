@@ -41,6 +41,9 @@ REQUIRED_TABLES=(
   "analytics.ingestion_runs"
   "analytics.parse_errors"
   "analytics.kafka_consumer_offsets"
+  "analytics.kafka_topic_offsets"
+  "analytics.kafka_consumer_lag_observations"
+  "analytics.dlq_replay_runs"
 )
 
 for rel in "${REQUIRED_TABLES[@]}"; do
@@ -137,6 +140,34 @@ fi
 OFF_EV="$(psql_exec -At -c "SELECT COUNT(*)::text FROM analytics.kafka_consumer_offsets WHERE consumer_group LIKE 'spark-normalize%';")"
 if [[ "${OFF_EV}" == "0" ]]; then
   warn "No analytics.kafka_consumer_offsets rows for spark-normalize% yet (expected until normalizers run in this environment)."
+fi
+
+echo "==> Phase 8 lag / DLQ depth views compile"
+psql_exec -c "SELECT COUNT(*) FROM analytics.v_kafka_topic_depth;"
+psql_exec -c "SELECT COUNT(*) FROM analytics.v_consumer_lag_latest;"
+psql_exec -c "SELECT COUNT(*) FROM analytics.v_dlq_topic_depth;"
+psql_exec -c "SELECT COUNT(*) FROM analytics.v_pipeline_lag_summary;"
+psql_exec -c "SELECT COUNT(*) FROM analytics.v_dlq_replay_runs;"
+
+LAG_OBS="$(psql_exec -At -c "SELECT COUNT(*)::text FROM analytics.kafka_consumer_lag_observations;")"
+TOP_OFF="$(psql_exec -At -c "SELECT COUNT(*)::text FROM analytics.kafka_topic_offsets;")"
+if [[ "${STRICT_QUALITY:-0}" == "1" ]] && [[ "${LAG_OBS}" == "0" ]] && [[ "${TOP_OFF}" == "0" ]]; then
+  fail "STRICT_QUALITY=1: no broker lag evidence rows (run make collect-lag)."
+fi
+if [[ "${LAG_OBS}" == "0" ]] && [[ "${TOP_OFF}" == "0" ]]; then
+  warn "No kafka lag observations yet (run make collect-lag after brokers are up)."
+fi
+
+THRESH="$(cd "${ROOT_DIR}" && uv run python -c "from wildfire_smoke.alert_thresholds import alert_thresholds_from_env as g; t=g(); print(t.dlq_depth_warn_messages, t.kafka_lag_warn_messages)")"
+DLQ_W="$(echo "${THRESH}" | awk '{print $1}')"
+LAG_W="$(echo "${THRESH}" | awk '{print $2}')"
+DLQ_SUM="$(psql_exec -At -c "SELECT COALESCE(SUM(approx_dlq_messages_proxy), 0)::text FROM analytics.v_dlq_topic_depth;")"
+LAG_SUM="$(psql_exec -At -c "SELECT COALESCE(SUM(lag), 0)::text FROM analytics.v_consumer_lag_latest WHERE consumer_group LIKE 'spark-normalize%' AND topic IN ('firms.hotspots.raw','openaq.measurements.raw','weather.wind.raw');")"
+if [[ "${DLQ_SUM}" =~ ^[0-9]+$ ]] && [[ "${DLQ_SUM}" -gt "${DLQ_W}" ]]; then
+  warn "DLQ depth proxy sum (${DLQ_SUM}) exceeds warn threshold (${DLQ_W})."
+fi
+if [[ "${LAG_SUM}" =~ ^[0-9]+$ ]] && [[ "${LAG_SUM}" -gt "${LAG_W}" ]]; then
+  warn "Raw-topic consumer lag sum (${LAG_SUM}) exceeds warn threshold (${LAG_W})."
 fi
 
 echo "Quality check passed (warnings=${WARNINGS})."
