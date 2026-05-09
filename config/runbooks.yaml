@@ -1,0 +1,20 @@
+# Maps analytics.fn_alert_candidates.alert_type values to operator docs under docs/runbooks/.
+mappings:
+  ingestion_failed:
+    slug: ingestion-failure
+    path: docs/runbooks/ingestion-failure.md
+  stale_firms_normalized:
+    slug: stale-firms-source
+    path: docs/runbooks/stale-firms-source.md
+  stale_openaq_normalized:
+    slug: stale-openaq-source
+    path: docs/runbooks/stale-openaq-source.md
+  no_recent_fire_detections:
+    slug: no-recent-fire-data
+    path: docs/runbooks/no-recent-fire-data.md
+  no_recent_air_quality:
+    slug: no-recent-aq-data
+    path: docs/runbooks/no-recent-aq-data.md
+  high_smoke_risk:
+    slug: high-smoke-risk
+    path: docs/runbooks/high-smoke-risk.md
