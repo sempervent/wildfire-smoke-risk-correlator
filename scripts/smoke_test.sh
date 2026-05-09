@@ -44,11 +44,12 @@ for t in \
   fi
 done
 
-echo "==> Producer dry-run mode (fixtures; no live NASA/OpenAQ calls)"
+echo "==> Producer dry-run mode (fixtures; no live NASA/OpenAQ/NWS calls)"
 export KAFKA_BOOTSTRAP_SERVERS="${KAFKA_BOOTSTRAP_SERVERS:-localhost:19092}"
 uv sync --extra dev >/dev/null
-FIRMS_DRY_RUN=1 OPENAQ_DRY_RUN=1 uv run python -m wildfire_smoke.producers.firms_producer
-FIRMS_DRY_RUN=1 OPENAQ_DRY_RUN=1 uv run python -m wildfire_smoke.producers.openaq_producer
+FIRMS_DRY_RUN=1 OPENAQ_DRY_RUN=1 WIND_DRY_RUN=1 uv run python -m wildfire_smoke.producers.firms_producer
+FIRMS_DRY_RUN=1 OPENAQ_DRY_RUN=1 WIND_DRY_RUN=1 uv run python -m wildfire_smoke.producers.openaq_producer
+FIRMS_DRY_RUN=1 OPENAQ_DRY_RUN=1 WIND_DRY_RUN=1 uv run python -m wildfire_smoke.producers.wind_producer
 
 echo "==> SQL views compile / are queryable"
 ${COMPOSE} exec -T postgres psql -v ON_ERROR_STOP=1 -U "${POSTGRES_USER}" -d "${POSTGRES_DB}" -c "SELECT COUNT(*) FROM analytics.smoke_risk_by_county;"
