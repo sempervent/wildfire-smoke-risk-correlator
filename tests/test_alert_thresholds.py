@@ -14,6 +14,12 @@ def test_alert_threshold_defaults(monkeypatch) -> None:
     monkeypatch.delenv("ALERT_PARSE_ERRORS_WARN_COUNT", raising=False)
     monkeypatch.delenv("ALERT_PARSE_ERRORS_CRITICAL_COUNT", raising=False)
     monkeypatch.delenv("ALERT_CONSUMER_OFFSET_STALE_HOURS", raising=False)
+    monkeypatch.delenv("ALERT_PARSER_SPIKE_WARN_COUNT", raising=False)
+    monkeypatch.delenv("ALERT_PARSER_SPIKE_CRITICAL_COUNT", raising=False)
+    monkeypatch.delenv("ALERT_KAFKA_LAG_WARN_MESSAGES", raising=False)
+    monkeypatch.delenv("ALERT_KAFKA_LAG_CRITICAL_MESSAGES", raising=False)
+    monkeypatch.delenv("ALERT_DLQ_DEPTH_WARN_MESSAGES", raising=False)
+    monkeypatch.delenv("ALERT_DLQ_DEPTH_CRITICAL_MESSAGES", raising=False)
 
     t = alert_thresholds_from_env()
     assert t.freshness_warn_hours == 6
@@ -32,6 +38,22 @@ def test_alert_threshold_overrides(monkeypatch) -> None:
     t = alert_thresholds_from_env()
     assert t.freshness_warn_hours == 8
     assert t.high_risk_min_score == 70.0
+
+
+def test_alert_threshold_phase8_overrides(monkeypatch) -> None:
+    monkeypatch.setenv("ALERT_PARSER_SPIKE_WARN_COUNT", "9")
+    monkeypatch.setenv("ALERT_PARSER_SPIKE_CRITICAL_COUNT", "33")
+    monkeypatch.setenv("ALERT_KAFKA_LAG_WARN_MESSAGES", "50")
+    monkeypatch.setenv("ALERT_KAFKA_LAG_CRITICAL_MESSAGES", "500")
+    monkeypatch.setenv("ALERT_DLQ_DEPTH_WARN_MESSAGES", "2")
+    monkeypatch.setenv("ALERT_DLQ_DEPTH_CRITICAL_MESSAGES", "80")
+    t = alert_thresholds_from_env()
+    assert t.parser_spike_warn_count == 9
+    assert t.parser_spike_critical_count == 33
+    assert t.kafka_lag_warn_messages == 50
+    assert t.kafka_lag_critical_messages == 500
+    assert t.dlq_depth_warn_messages == 2
+    assert t.dlq_depth_critical_messages == 80
 
 
 def test_alert_threshold_parse_dlq_overrides(monkeypatch) -> None:

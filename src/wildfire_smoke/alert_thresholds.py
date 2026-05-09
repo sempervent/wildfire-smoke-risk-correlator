@@ -34,6 +34,12 @@ class AlertThresholds:
     parse_errors_warn_count: int
     parse_errors_critical_count: int
     consumer_offset_stale_hours: int
+    parser_spike_warn_count: int
+    parser_spike_critical_count: int
+    kafka_lag_warn_messages: int
+    kafka_lag_critical_messages: int
+    dlq_depth_warn_messages: int
+    dlq_depth_critical_messages: int
 
 
 def alert_thresholds_from_env() -> AlertThresholds:
@@ -46,4 +52,10 @@ def alert_thresholds_from_env() -> AlertThresholds:
         parse_errors_warn_count=_positive_int(os.environ.get("ALERT_PARSE_ERRORS_WARN_COUNT"), 1),
         parse_errors_critical_count=_positive_int(os.environ.get("ALERT_PARSE_ERRORS_CRITICAL_COUNT"), 25),
         consumer_offset_stale_hours=_positive_int(os.environ.get("ALERT_CONSUMER_OFFSET_STALE_HOURS"), 6),
+        parser_spike_warn_count=_positive_int(os.environ.get("ALERT_PARSER_SPIKE_WARN_COUNT"), 15),
+        parser_spike_critical_count=_positive_int(os.environ.get("ALERT_PARSER_SPIKE_CRITICAL_COUNT"), 40),
+        kafka_lag_warn_messages=_positive_int(os.environ.get("ALERT_KAFKA_LAG_WARN_MESSAGES"), 100),
+        kafka_lag_critical_messages=_positive_int(os.environ.get("ALERT_KAFKA_LAG_CRITICAL_MESSAGES"), 1000),
+        dlq_depth_warn_messages=_positive_int(os.environ.get("ALERT_DLQ_DEPTH_WARN_MESSAGES"), 1),
+        dlq_depth_critical_messages=_positive_int(os.environ.get("ALERT_DLQ_DEPTH_CRITICAL_MESSAGES"), 100),
     )

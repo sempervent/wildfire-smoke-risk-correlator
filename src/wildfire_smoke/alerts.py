@@ -47,6 +47,9 @@ def stable_fingerprint_details(alert_type: str, details: dict[str, Any]) -> dict
         "parser_failure_spike",
         "dlq_records_present",
         "consumer_offset_stale",
+        "kafka_lag_high",
+        "dlq_depth_high",
+        "replay_failures_recent",
     }:
         return {}
     return {}
@@ -72,6 +75,9 @@ def fingerprint_for_candidate(
             "parser_failure_spike",
             "dlq_records_present",
             "consumer_offset_stale",
+            "kafka_lag_high",
+            "dlq_depth_high",
+            "replay_failures_recent",
         }
         else title
     )
@@ -94,7 +100,8 @@ def fetch_candidates(conn: psycopg.Connection) -> list[tuple[Any, ...]]:
             """
             SELECT alert_type, severity, geography_type, geoid, title, description, observed_at, details
             FROM analytics.fn_alert_candidates(
-              %s, %s, %s::double precision, %s, %s::double precision, %s, %s, %s
+              %s, %s, %s::double precision, %s, %s::double precision, %s, %s, %s,
+              %s, %s, %s::bigint, %s::bigint, %s::bigint, %s::bigint
             )
             """,
             (
@@ -106,6 +113,12 @@ def fetch_candidates(conn: psycopg.Connection) -> list[tuple[Any, ...]]:
                 thr.parse_errors_warn_count,
                 thr.parse_errors_critical_count,
                 thr.consumer_offset_stale_hours,
+                thr.parser_spike_warn_count,
+                thr.parser_spike_critical_count,
+                thr.kafka_lag_warn_messages,
+                thr.kafka_lag_critical_messages,
+                thr.dlq_depth_warn_messages,
+                thr.dlq_depth_critical_messages,
             ),
         )
         return list(cur.fetchall())
