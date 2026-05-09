@@ -51,6 +51,9 @@ FIRMS_DRY_RUN=1 OPENAQ_DRY_RUN=1 uv run python -m wildfire_smoke.producers.opena
 echo "==> SQL views compile / are queryable"
 ${COMPOSE} exec -T postgres psql -v ON_ERROR_STOP=1 -U "${POSTGRES_USER}" -d "${POSTGRES_DB}" -c "SELECT COUNT(*) FROM analytics.smoke_risk_by_county;"
 ${COMPOSE} exec -T postgres psql -v ON_ERROR_STOP=1 -U "${POSTGRES_USER}" -d "${POSTGRES_DB}" -c "SELECT COUNT(*) FROM analytics.smoke_risk_by_tract;"
+echo "==> Phase 2 analytics views compile / are queryable"
+${COMPOSE} exec -T postgres psql -v ON_ERROR_STOP=1 -U "${POSTGRES_USER}" -d "${POSTGRES_DB}" -c "SELECT COUNT(*) FROM analytics.v_source_freshness;"
+${COMPOSE} exec -T postgres psql -v ON_ERROR_STOP=1 -U "${POSTGRES_USER}" -d "${POSTGRES_DB}" -c "SELECT COUNT(*) FROM analytics.v_data_quality_summary;"
 
 echo "==> Risk computation job runs (may insert 0 rows if no correlated window data)"
 bash "${ROOT_DIR}/scripts/run_compute_risk.sh"
