@@ -66,6 +66,15 @@ ${COMPOSE} exec -T postgres psql -v ON_ERROR_STOP=1 -U "${POSTGRES_USER}" -d "${
 echo "==> Risk computation job runs (may insert 0 rows if no correlated window data)"
 bash "${ROOT_DIR}/scripts/run_compute_risk.sh"
 
+echo "==> Phase 4 alert persistence + routing (table + dry-run materialize + console send)"
+${COMPOSE} exec -T postgres psql -v ON_ERROR_STOP=1 -U "${POSTGRES_USER}" -d "${POSTGRES_DB}" -c \
+  "SELECT COUNT(*) FROM analytics.alert_events;"
+ALERTS_DRY_RUN=1 bash "${ROOT_DIR}/scripts/materialize_alerts.sh"
+ALERT_NOTIFIER=console ALERT_SEVERITY_MIN=warning ALERT_LIMIT=10 FORCE_NOTIFY=1 bash "${ROOT_DIR}/scripts/send_alerts.sh"
+bash -n "${ROOT_DIR}/scripts/run_operational_cycle.sh"
+bash -n "${ROOT_DIR}/scripts/live_ingest_once.sh"
+test -f "${ROOT_DIR}/docs/runbooks/alert-overview.md"
+
 echo "==> alerts-check (warn-only; fixture data is often stale)"
 ALERTS_WARN_ONLY=1 bash "${ROOT_DIR}/scripts/check_alerts.sh"
 
