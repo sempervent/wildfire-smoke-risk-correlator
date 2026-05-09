@@ -390,17 +390,137 @@
       ],
       "title": "Recent operational cycles",
       "type": "table"
+    },
+    {
+      "datasource": {"type": "postgres", "uid": "smoke_pg"},
+      "fieldConfig": {"defaults": {}, "overrides": []},
+      "gridPos": {"h": 9, "w": 12, "x": 0, "y": 83},
+      "id": 300,
+      "options": {"showHeader": true},
+      "targets": [
+        {
+          "datasource": {"type": "postgres", "uid": "smoke_pg"},
+          "editorMode": "code",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "SELECT wind_observation_id, source, station_id, observed_at, wind_speed_mps, wind_direction_degrees, county_geoid FROM analytics.v_latest_wind_observations ORDER BY observed_at DESC NULLS LAST LIMIT 80;",
+          "refId": "A"
+        }
+      ],
+      "title": "Latest wind observations (normalized)",
+      "type": "table"
+    },
+    {
+      "datasource": {"type": "postgres", "uid": "smoke_pg"},
+      "fieldConfig": {"defaults": {}, "overrides": []},
+      "gridPos": {"h": 10, "w": 12, "x": 12, "y": 83},
+      "id": 301,
+      "options": {
+        "basemap": {"config": {}, "name": "Layer 0", "opacity": 1, "tooltip": false, "type": "default"},
+        "controls": {"mouseWheelZoom": true, "showAttribution": true, "showDebug": false, "showMeasure": false, "showScale": false, "showZoom": true},
+        "layers": [
+          {
+            "config": {
+              "showLegend": false,
+              "style": {
+                "color": {"fixed": "semi-dark-blue"},
+                "opacity": 0.85,
+                "rotation": {"fixed": 0, "mode": "mod"},
+                "size": {"fixed": 8, "max": 14, "min": 4},
+                "symbol": {"fixed": "img/icons/marker/triangle.svg", "mode": "fixed"}
+              }
+            },
+            "filterData": {"id": "byRefId", "options": "A"},
+            "name": "Wind",
+            "opacity": 1,
+            "tooltip": true,
+            "type": "markers"
+          }
+        ],
+        "tooltip": {"mode": "details"},
+        "view": {"allLayers": true, "id": "fit", "lat": 36.16, "lon": -86.78, "zoom": 6}
+      },
+      "pluginVersion": "11.3.0",
+      "targets": [
+        {
+          "datasource": {"type": "postgres", "uid": "smoke_pg"},
+          "editorMode": "code",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "SELECT longitude, latitude, wind_observation_id::text AS wind_observation_id, wind_speed_mps, wind_direction_degrees FROM analytics.v_latest_wind_observations_geojson LIMIT 200;",
+          "refId": "A"
+        }
+      ],
+      "title": "Wind observations (map)",
+      "type": "geomap"
+    },
+    {
+      "datasource": {"type": "postgres", "uid": "smoke_pg"},
+      "fieldConfig": {"defaults": {}, "overrides": []},
+      "gridPos": {"h": 9, "w": 24, "x": 0, "y": 93},
+      "id": 302,
+      "options": {"showHeader": true},
+      "targets": [
+        {
+          "datasource": {"type": "postgres", "uid": "smoke_pg"},
+          "editorMode": "code",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "SELECT exposure_rank, geography_type, geoid, exposure_score, detection_id, distance_km, angular_error_degrees, window_end, computed_at FROM analytics.v_top_plume_exposures ORDER BY exposure_rank ASC LIMIT 50;",
+          "refId": "A"
+        }
+      ],
+      "title": "Top plume exposures (wind_v1 corridor)",
+      "type": "table"
+    },
+    {
+      "datasource": {"type": "postgres", "uid": "smoke_pg"},
+      "fieldConfig": {"defaults": {}, "overrides": []},
+      "gridPos": {"h": 7, "w": 12, "x": 0, "y": 102},
+      "id": 303,
+      "options": {"showHeader": true},
+      "targets": [
+        {
+          "datasource": {"type": "postgres", "uid": "smoke_pg"},
+          "editorMode": "code",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "SELECT * FROM analytics.v_smoke_transport_summary;",
+          "refId": "A"
+        }
+      ],
+      "title": "Smoke transport summary",
+      "type": "table"
+    },
+    {
+      "datasource": {"type": "postgres", "uid": "smoke_pg"},
+      "fieldConfig": {"defaults": {}, "overrides": []},
+      "gridPos": {"h": 9, "w": 12, "x": 12, "y": 102},
+      "id": 304,
+      "options": {"showHeader": true},
+      "targets": [
+        {
+          "datasource": {"type": "postgres", "uid": "smoke_pg"},
+          "editorMode": "code",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "SELECT geography_type, geography_name, geoid, risk_score, risk_band, window_end, LEFT(explanation::text, 200) AS explanation_preview FROM analytics.v_latest_smoke_risk_v3 ORDER BY risk_score DESC NULLS LAST LIMIT 40;",
+          "refId": "A"
+        }
+      ],
+      "title": "Smoke risk v3 (latest rows)",
+      "type": "table"
     }
   ],
   "refresh": "30s",
   "schemaVersion": 39,
-  "tags": ["smoke", "wildfire", "phase3", "phase5"],
+  "tags": ["smoke", "wildfire", "phase3", "phase5", "phase6"],
   "templating": {"list": []},
   "time": {"from": "now-7d", "to": "now"},
   "timepicker": {},
   "timezone": "browser",
-  "title": "Wildfire Smoke Risk (Phase 3 + Phase 5 ops)",
+  "title": "Wildfire Smoke Risk (Phase 3–6 ops)",
   "uid": "wildfire-smoke-phase2",
-  "version": 2,
+  "version": 3,
   "weekStart": ""
 }
