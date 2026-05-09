@@ -31,6 +31,9 @@ class AlertThresholds:
     high_risk_min_score: float
     lookback_hours: int
     high_plume_exposure_min_score: float
+    parse_errors_warn_count: int
+    parse_errors_critical_count: int
+    consumer_offset_stale_hours: int
 
 
 def alert_thresholds_from_env() -> AlertThresholds:
@@ -40,4 +43,7 @@ def alert_thresholds_from_env() -> AlertThresholds:
         high_risk_min_score=_positive_float(os.environ.get("ALERT_HIGH_RISK_MIN_SCORE"), 75.0),
         lookback_hours=_positive_int(os.environ.get("ALERT_LOOKBACK_HOURS"), 24),
         high_plume_exposure_min_score=_positive_float(os.environ.get("ALERT_HIGH_PLUME_EXPOSURE_MIN_SCORE"), 70.0),
+        parse_errors_warn_count=_positive_int(os.environ.get("ALERT_PARSE_ERRORS_WARN_COUNT"), 1),
+        parse_errors_critical_count=_positive_int(os.environ.get("ALERT_PARSE_ERRORS_CRITICAL_COUNT"), 25),
+        consumer_offset_stale_hours=_positive_int(os.environ.get("ALERT_CONSUMER_OFFSET_STALE_HOURS"), 6),
     )

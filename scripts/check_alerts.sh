@@ -20,6 +20,9 @@ print(json.dumps({
   'risk_min': t.high_risk_min_score,
   'lookback_h': t.lookback_hours,
   'plume_min': t.high_plume_exposure_min_score,
+  'parse_warn': t.parse_errors_warn_count,
+  'parse_crit': t.parse_errors_critical_count,
+  'offset_stale_h': t.consumer_offset_stale_hours,
 }))
 ")"
 
@@ -28,13 +31,16 @@ CRIT_H="$(echo "${THRESHOLDS_JSON}" | uv run python -c "import sys,json; print(i
 RISK_MIN="$(echo "${THRESHOLDS_JSON}" | uv run python -c "import sys,json; print(float(json.load(sys.stdin)['risk_min']))")"
 LB_H="$(echo "${THRESHOLDS_JSON}" | uv run python -c "import sys,json; print(int(json.load(sys.stdin)['lookback_h']))")"
 PLUME_MIN="$(echo "${THRESHOLDS_JSON}" | uv run python -c "import sys,json; print(float(json.load(sys.stdin)['plume_min']))")"
+PARSE_WARN="$(echo "${THRESHOLDS_JSON}" | uv run python -c "import sys,json; print(int(json.load(sys.stdin)['parse_warn']))")"
+PARSE_CRIT="$(echo "${THRESHOLDS_JSON}" | uv run python -c "import sys,json; print(int(json.load(sys.stdin)['parse_crit']))")"
+OFFSET_STALE_H="$(echo "${THRESHOLDS_JSON}" | uv run python -c "import sys,json; print(int(json.load(sys.stdin)['offset_stale_h']))")"
 
-echo "==> Alert thresholds: warn_h=${WARN_H} crit_h=${CRIT_H} risk_min=${RISK_MIN} lookback_h=${LB_H} plume_min=${PLUME_MIN} ALERTS_WARN_ONLY=${WARN_ONLY}"
+echo "==> Alert thresholds: warn_h=${WARN_H} crit_h=${CRIT_H} risk_min=${RISK_MIN} lookback_h=${LB_H} plume_min=${PLUME_MIN} parse_warn=${PARSE_WARN} parse_crit=${PARSE_CRIT} offset_stale_h=${OFFSET_STALE_H} ALERTS_WARN_ONLY=${WARN_ONLY}"
 
 echo "==> Alert candidates"
 ${COMPOSE} exec -T postgres psql -v ON_ERROR_STOP=1 -U "${POSTGRES_USER}" -d "${POSTGRES_DB}" -c "
 SELECT alert_type, severity, geography_type, geoid, title, observed_at
-FROM analytics.fn_alert_candidates(${WARN_H}, ${CRIT_H}, ${RISK_MIN}::double precision, ${LB_H}, ${PLUME_MIN}::double precision)
+FROM analytics.fn_alert_candidates(${WARN_H}, ${CRIT_H}, ${RISK_MIN}::double precision, ${LB_H}, ${PLUME_MIN}::double precision, ${PARSE_WARN}, ${PARSE_CRIT}, ${OFFSET_STALE_H})
 ORDER BY
   CASE severity WHEN 'critical' THEN 0 WHEN 'warn' THEN 1 ELSE 2 END,
   observed_at DESC NULLS LAST;
@@ -42,7 +48,7 @@ ORDER BY
 
 CRIT_COUNT="$(${COMPOSE} exec -T postgres psql -At -U "${POSTGRES_USER}" -d "${POSTGRES_DB}" -c "
 SELECT COUNT(*)::text
-FROM analytics.fn_alert_candidates(${WARN_H}, ${CRIT_H}, ${RISK_MIN}::double precision, ${LB_H}, ${PLUME_MIN}::double precision)
+FROM analytics.fn_alert_candidates(${WARN_H}, ${CRIT_H}, ${RISK_MIN}::double precision, ${LB_H}, ${PLUME_MIN}::double precision, ${PARSE_WARN}, ${PARSE_CRIT}, ${OFFSET_STALE_H})
 WHERE severity = 'critical';
 ")"
 
