@@ -1,6 +1,6 @@
 COMPOSE ?= docker compose
 
-.PHONY: up down reset db-bootstrap topics ingest-once normalize compute-risk smoke-test test deps quality-check replay-fixtures
+.PHONY: up down reset db-bootstrap topics ingest-once normalize compute-risk smoke-test test deps quality-check replay-fixtures grafana-up
 
 deps:
 	uv sync --extra dev
@@ -36,6 +36,9 @@ quality-check:
 
 replay-fixtures:
 	bash scripts/replay_fixtures.sh
+
+grafana-up:
+	$(COMPOSE) --profile grafana up -d grafana
 
 smoke-test:
 	bash scripts/smoke_test.sh
