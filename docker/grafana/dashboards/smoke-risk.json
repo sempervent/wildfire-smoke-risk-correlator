@@ -295,16 +295,111 @@
       ],
       "title": "Data quality summary (counts)",
       "type": "table"
+    },
+    {
+      "datasource": {"type": "postgres", "uid": "smoke_pg"},
+      "fieldConfig": {"defaults": {}, "overrides": []},
+      "gridPos": {"h": 9, "w": 12, "x": 0, "y": 56},
+      "id": 200,
+      "options": {"showHeader": true},
+      "targets": [
+        {
+          "datasource": {"type": "postgres", "uid": "smoke_pg"},
+          "editorMode": "code",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "SELECT alert_event_id, severity, alert_type, title, last_seen_at, runbook_slug FROM analytics.v_open_alert_events ORDER BY last_seen_at DESC LIMIT 50;",
+          "refId": "A"
+        }
+      ],
+      "title": "Open alert events",
+      "type": "table"
+    },
+    {
+      "datasource": {"type": "postgres", "uid": "smoke_pg"},
+      "fieldConfig": {"defaults": {}, "overrides": []},
+      "gridPos": {"h": 9, "w": 12, "x": 12, "y": 56},
+      "id": 201,
+      "options": {"showHeader": true},
+      "targets": [
+        {
+          "datasource": {"type": "postgres", "uid": "smoke_pg"},
+          "editorMode": "code",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "SELECT notifier, status, attempt_count, last_attempted_at FROM analytics.v_notification_attempt_summary ORDER BY notifier, status;",
+          "refId": "A"
+        }
+      ],
+      "title": "Notification attempts (summary)",
+      "type": "table"
+    },
+    {
+      "datasource": {"type": "postgres", "uid": "smoke_pg"},
+      "fieldConfig": {"defaults": {}, "overrides": []},
+      "gridPos": {"h": 9, "w": 12, "x": 0, "y": 65},
+      "id": 202,
+      "options": {"showHeader": true},
+      "targets": [
+        {
+          "datasource": {"type": "postgres", "uid": "smoke_pg"},
+          "editorMode": "code",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "SELECT attempted_at, notifier, alert_event_id, error_class, LEFT(error_message, 120) AS error_message, retry_after FROM analytics.v_notification_failures ORDER BY attempted_at DESC LIMIT 50;",
+          "refId": "A"
+        }
+      ],
+      "title": "Recent notification failures",
+      "type": "table"
+    },
+    {
+      "datasource": {"type": "postgres", "uid": "smoke_pg"},
+      "fieldConfig": {"defaults": {}, "overrides": []},
+      "gridPos": {"h": 9, "w": 12, "x": 12, "y": 65},
+      "id": 203,
+      "options": {"showHeader": true},
+      "targets": [
+        {
+          "datasource": {"type": "postgres", "uid": "smoke_pg"},
+          "editorMode": "code",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "SELECT alert_event_id, notifier, last_status, success_count, failure_count, skipped_count FROM analytics.v_alert_delivery_state ORDER BY alert_event_id DESC LIMIT 80;",
+          "refId": "A"
+        }
+      ],
+      "title": "Alert delivery state (open)",
+      "type": "table"
+    },
+    {
+      "datasource": {"type": "postgres", "uid": "smoke_pg"},
+      "fieldConfig": {"defaults": {}, "overrides": []},
+      "gridPos": {"h": 8, "w": 24, "x": 0, "y": 74},
+      "id": 204,
+      "options": {"showHeader": true},
+      "targets": [
+        {
+          "datasource": {"type": "postgres", "uid": "smoke_pg"},
+          "editorMode": "code",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "SELECT operational_run_id, mode, started_at, finished_at, status, LEFT(error_message, 120) AS error_message FROM analytics.v_recent_operational_cycles ORDER BY started_at DESC LIMIT 30;",
+          "refId": "A"
+        }
+      ],
+      "title": "Recent operational cycles",
+      "type": "table"
     }
   ],
   "refresh": "30s",
   "schemaVersion": 39,
-  "tags": ["smoke", "wildfire", "phase3"],
+  "tags": ["smoke", "wildfire", "phase3", "phase5"],
   "templating": {"list": []},
   "time": {"from": "now-7d", "to": "now"},
   "timepicker": {},
   "timezone": "browser",
-  "title": "Wildfire Smoke Risk (Phase 3)",
+  "title": "Wildfire Smoke Risk (Phase 3 + Phase 5 ops)",
   "uid": "wildfire-smoke-phase2",
   "version": 2,
   "weekStart": ""
