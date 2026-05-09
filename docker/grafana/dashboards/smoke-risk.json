@@ -1,7 +1,5 @@
 {
-  "annotations": {
-    "list": []
-  },
+  "annotations": {"list": []},
   "editable": true,
   "fiscalYearStartMonth": 0,
   "graphTooltip": 0,
@@ -9,100 +7,190 @@
   "liveNow": false,
   "panels": [
     {
-      "datasource": {
-        "type": "postgres",
-        "uid": "smoke_pg"
-      },
-      "fieldConfig": {
-        "defaults": {},
-        "overrides": []
-      },
-      "gridPos": {
-        "h": 9,
-        "w": 12,
-        "x": 0,
-        "y": 0
-      },
-      "id": 1,
+      "datasource": {"type": "postgres", "uid": "smoke_pg"},
+      "fieldConfig": {"defaults": {}, "overrides": []},
+      "gridPos": {"h": 11, "w": 12, "x": 0, "y": 0},
+      "id": 10,
       "options": {
-        "showHeader": true
+        "basemap": {"config": {}, "name": "Layer 0", "opacity": 1, "tooltip": false, "type": "default"},
+        "controls": {"mouseWheelZoom": true, "showAttribution": true, "showDebug": false, "showMeasure": false, "showScale": false, "showZoom": true},
+        "layers": [
+          {
+            "config": {
+              "showLegend": true,
+              "style": {
+                "color": {"field": "risk_band"},
+                "opacity": 0.88,
+                "rotation": {"fixed": 0, "mode": "mod"},
+                "size": {"fixed": 11, "max": 18, "min": 5},
+                "symbol": {"fixed": "img/icons/marker/circle.svg", "mode": "fixed"}
+              }
+            },
+            "filterData": {"id": "byRefId", "options": "A"},
+            "name": "County risk (centroid)",
+            "opacity": 1,
+            "tooltip": true,
+            "type": "markers"
+          }
+        ],
+        "tooltip": {"mode": "details"},
+        "view": {"allLayers": true, "id": "fit", "lat": 35.75, "lon": -86.35, "zoom": 6.5}
       },
+      "pluginVersion": "11.3.0",
       "targets": [
         {
-          "datasource": {
-            "type": "postgres",
-            "uid": "smoke_pg"
-          },
+          "datasource": {"type": "postgres", "uid": "smoke_pg"},
           "editorMode": "code",
           "format": "table",
           "rawQuery": true,
-          "rawSql": "SELECT geography_name, geoid, risk_score, risk_band, window_end, model_version FROM analytics.v_latest_smoke_risk_by_county ORDER BY risk_score DESC NULLS LAST LIMIT 200;",
+          "rawSql": "SELECT centroid_longitude AS longitude, centroid_latitude AS latitude, risk_band::text AS risk_band, geoid::text AS geoid, risk_score, name FROM analytics.v_latest_smoke_risk_county_geojson WHERE model_version = 'v2' ORDER BY risk_score DESC NULLS LAST LIMIT 400;",
           "refId": "A"
         }
       ],
-      "title": "Smoke risk by county (latest)",
-      "type": "table"
+      "title": "County smoke risk (map — centroids)",
+      "type": "geomap"
     },
     {
-      "datasource": {
-        "type": "postgres",
-        "uid": "smoke_pg"
-      },
-      "fieldConfig": {
-        "defaults": {},
-        "overrides": []
-      },
-      "gridPos": {
-        "h": 9,
-        "w": 12,
-        "x": 12,
-        "y": 0
-      },
-      "id": 2,
+      "datasource": {"type": "postgres", "uid": "smoke_pg"},
+      "fieldConfig": {"defaults": {}, "overrides": []},
+      "gridPos": {"h": 11, "w": 12, "x": 12, "y": 0},
+      "id": 11,
       "options": {
-        "showHeader": true
+        "basemap": {"config": {}, "name": "Layer 0", "opacity": 1, "tooltip": false, "type": "default"},
+        "controls": {"mouseWheelZoom": true, "showAttribution": true, "showDebug": false, "showMeasure": false, "showScale": false, "showZoom": true},
+        "layers": [
+          {
+            "config": {
+              "showLegend": false,
+              "style": {
+                "color": {"fixed": "dark-orange"},
+                "opacity": 0.75,
+                "rotation": {"fixed": 0, "mode": "mod"},
+                "size": {"fixed": 7, "max": 14, "min": 3},
+                "symbol": {"fixed": "img/icons/marker/circle.svg", "mode": "fixed"}
+              }
+            },
+            "filterData": {"id": "byRefId", "options": "A"},
+            "name": "Tract risk (centroid)",
+            "opacity": 1,
+            "tooltip": true,
+            "type": "markers"
+          }
+        ],
+        "tooltip": {"mode": "details"},
+        "view": {"allLayers": true, "id": "fit", "lat": 35.75, "lon": -86.35, "zoom": 7.5}
       },
+      "pluginVersion": "11.3.0",
       "targets": [
         {
-          "datasource": {
-            "type": "postgres",
-            "uid": "smoke_pg"
-          },
+          "datasource": {"type": "postgres", "uid": "smoke_pg"},
           "editorMode": "code",
           "format": "table",
           "rawQuery": true,
-          "rawSql": "SELECT geography_name, geoid, risk_score, risk_band, window_end, model_version FROM analytics.v_latest_smoke_risk_by_tract ORDER BY risk_score DESC NULLS LAST LIMIT 200;",
+          "rawSql": "SELECT centroid_longitude AS longitude, centroid_latitude AS latitude, risk_band::text AS risk_band, geoid::text AS geoid, risk_score, name FROM analytics.v_latest_smoke_risk_tract_geojson WHERE model_version = 'v2' ORDER BY risk_score DESC NULLS LAST LIMIT 600;",
           "refId": "A"
         }
       ],
-      "title": "Smoke risk by tract (latest)",
-      "type": "table"
+      "title": "Tract smoke risk (map — centroids)",
+      "type": "geomap"
     },
     {
-      "datasource": {
-        "type": "postgres",
-        "uid": "smoke_pg"
+      "datasource": {"type": "postgres", "uid": "smoke_pg"},
+      "fieldConfig": {"defaults": {}, "overrides": []},
+      "gridPos": {"h": 11, "w": 12, "x": 0, "y": 11},
+      "id": 12,
+      "options": {
+        "basemap": {"config": {}, "name": "Layer 0", "opacity": 1, "tooltip": false, "type": "default"},
+        "controls": {"mouseWheelZoom": true, "showAttribution": true, "showDebug": false, "showMeasure": false, "showScale": false, "showZoom": true},
+        "layers": [
+          {
+            "config": {
+              "showLegend": false,
+              "style": {
+                "color": {"fixed": "red"},
+                "opacity": 0.85,
+                "rotation": {"fixed": 0, "mode": "mod"},
+                "size": {"fixed": 9, "max": 15, "min": 4},
+                "symbol": {"fixed": "img/icons/marker/circle.svg", "mode": "fixed"}
+              }
+            },
+            "filterData": {"id": "byRefId", "options": "A"},
+            "name": "Fires",
+            "opacity": 1,
+            "tooltip": true,
+            "type": "markers"
+          }
+        ],
+        "tooltip": {"mode": "details"},
+        "view": {"allLayers": true, "id": "fit", "lat": 36.16, "lon": -86.78, "zoom": 7}
       },
-      "fieldConfig": {
-        "defaults": {},
-        "overrides": []
+      "pluginVersion": "11.3.0",
+      "targets": [
+        {
+          "datasource": {"type": "postgres", "uid": "smoke_pg"},
+          "editorMode": "code",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "SELECT longitude, latitude, detection_id::text AS detection_id, source::text AS source, acq_datetime, frp FROM analytics.v_latest_fire_detections_geojson LIMIT 400;",
+          "refId": "A"
+        }
+      ],
+      "title": "Fire detections (map)",
+      "type": "geomap"
+    },
+    {
+      "datasource": {"type": "postgres", "uid": "smoke_pg"},
+      "fieldConfig": {"defaults": {}, "overrides": []},
+      "gridPos": {"h": 11, "w": 12, "x": 12, "y": 11},
+      "id": 13,
+      "options": {
+        "basemap": {"config": {}, "name": "Layer 0", "opacity": 1, "tooltip": false, "type": "default"},
+        "controls": {"mouseWheelZoom": true, "showAttribution": true, "showDebug": false, "showMeasure": false, "showScale": false, "showZoom": true},
+        "layers": [
+          {
+            "config": {
+              "showLegend": false,
+              "style": {
+                "color": {"field": "parameter"},
+                "opacity": 0.85,
+                "rotation": {"fixed": 0, "mode": "mod"},
+                "size": {"fixed": 9, "max": 15, "min": 4},
+                "symbol": {"fixed": "img/icons/marker/circle.svg", "mode": "fixed"}
+              }
+            },
+            "filterData": {"id": "byRefId", "options": "A"},
+            "name": "AQ",
+            "opacity": 1,
+            "tooltip": true,
+            "type": "markers"
+          }
+        ],
+        "tooltip": {"mode": "details"},
+        "view": {"allLayers": true, "id": "fit", "lat": 36.16, "lon": -86.78, "zoom": 7}
       },
-      "gridPos": {
-        "h": 9,
-        "w": 24,
-        "x": 0,
-        "y": 9
-      },
+      "pluginVersion": "11.3.0",
+      "targets": [
+        {
+          "datasource": {"type": "postgres", "uid": "smoke_pg"},
+          "editorMode": "code",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "SELECT longitude, latitude, parameter::text AS parameter, value, unit::text AS unit, measured_at FROM analytics.v_latest_air_quality_geojson LIMIT 400;",
+          "refId": "A"
+        }
+      ],
+      "title": "Air quality measurements (map)",
+      "type": "geomap"
+    },
+    {
+      "datasource": {"type": "postgres", "uid": "smoke_pg"},
+      "fieldConfig": {"defaults": {}, "overrides": []},
+      "gridPos": {"h": 9, "w": 24, "x": 0, "y": 22},
       "id": 3,
-      "options": {
-        "showHeader": true
-      },
+      "options": {"showHeader": true},
       "targets": [
         {
-          "datasource": {
-            "type": "postgres",
-            "uid": "smoke_pg"
-          },
+          "datasource": {"type": "postgres", "uid": "smoke_pg"},
           "editorMode": "code",
           "format": "table",
           "rawQuery": true,
@@ -114,100 +202,52 @@
       "type": "table"
     },
     {
-      "datasource": {
-        "type": "postgres",
-        "uid": "smoke_pg"
-      },
-      "fieldConfig": {
-        "defaults": {},
-        "overrides": []
-      },
-      "gridPos": {
-        "h": 9,
-        "w": 12,
-        "x": 0,
-        "y": 18
-      },
-      "id": 4,
-      "options": {
-        "showHeader": true
-      },
+      "datasource": {"type": "postgres", "uid": "smoke_pg"},
+      "fieldConfig": {"defaults": {}, "overrides": []},
+      "gridPos": {"h": 8, "w": 12, "x": 0, "y": 31},
+      "id": 14,
+      "options": {"showHeader": true},
       "targets": [
         {
-          "datasource": {
-            "type": "postgres",
-            "uid": "smoke_pg"
-          },
+          "datasource": {"type": "postgres", "uid": "smoke_pg"},
           "editorMode": "code",
           "format": "table",
           "rawQuery": true,
-          "rawSql": "SELECT detection_id, source, acq_datetime, county_geoid, tract_geoid, frp, latitude, longitude FROM analytics.v_latest_fire_detections LIMIT 100;",
+          "rawSql": "SELECT geoid, name, risk_score, risk_band, centroid_latitude, centroid_longitude, LEFT(geojson_simplified::text, 120) AS geojson_preview FROM analytics.v_latest_smoke_risk_county_geojson WHERE model_version = 'v2' ORDER BY risk_score DESC NULLS LAST LIMIT 50;",
           "refId": "A"
         }
       ],
-      "title": "Latest fire detections",
+      "title": "County GeoJSON (truncated preview)",
       "type": "table"
     },
     {
-      "datasource": {
-        "type": "postgres",
-        "uid": "smoke_pg"
-      },
-      "fieldConfig": {
-        "defaults": {},
-        "overrides": []
-      },
-      "gridPos": {
-        "h": 9,
-        "w": 12,
-        "x": 12,
-        "y": 18
-      },
-      "id": 5,
-      "options": {
-        "showHeader": true
-      },
+      "datasource": {"type": "postgres", "uid": "smoke_pg"},
+      "fieldConfig": {"defaults": {}, "overrides": []},
+      "gridPos": {"h": 8, "w": 12, "x": 12, "y": 31},
+      "id": 15,
+      "options": {"showHeader": true},
       "targets": [
         {
-          "datasource": {
-            "type": "postgres",
-            "uid": "smoke_pg"
-          },
+          "datasource": {"type": "postgres", "uid": "smoke_pg"},
           "editorMode": "code",
           "format": "table",
           "rawQuery": true,
-          "rawSql": "SELECT measurement_id, parameter, measured_at, value, unit, county_geoid, tract_geoid, latitude, longitude FROM analytics.v_latest_air_quality_measurements LIMIT 100;",
+          "rawSql": "SELECT geoid, name, risk_score, risk_band, centroid_latitude, centroid_longitude, LEFT(geojson_simplified::text, 120) AS geojson_preview FROM analytics.v_latest_smoke_risk_tract_geojson WHERE model_version = 'v2' ORDER BY risk_score DESC NULLS LAST LIMIT 50;",
           "refId": "A"
         }
       ],
-      "title": "Latest air quality measurements",
+      "title": "Tract GeoJSON (truncated preview)",
       "type": "table"
     },
     {
-      "datasource": {
-        "type": "postgres",
-        "uid": "smoke_pg"
-      },
-      "fieldConfig": {
-        "defaults": {},
-        "overrides": []
-      },
-      "gridPos": {
-        "h": 9,
-        "w": 12,
-        "x": 0,
-        "y": 27
-      },
+      "datasource": {"type": "postgres", "uid": "smoke_pg"},
+      "fieldConfig": {"defaults": {}, "overrides": []},
+      "gridPos": {"h": 9, "w": 12, "x": 0, "y": 39},
       "id": 6,
-      "options": {
-        "showHeader": true
-      },
+      "options": {"showHeader": true},
       "targets": [
         {
-          "datasource": {
-            "type": "postgres",
-            "uid": "smoke_pg"
-          },
+          "datasource": {"type": "postgres", "uid": "smoke_pg"},
           "editorMode": "code",
           "format": "table",
           "rawQuery": true,
@@ -219,30 +259,14 @@
       "type": "table"
     },
     {
-      "datasource": {
-        "type": "postgres",
-        "uid": "smoke_pg"
-      },
-      "fieldConfig": {
-        "defaults": {},
-        "overrides": []
-      },
-      "gridPos": {
-        "h": 9,
-        "w": 12,
-        "x": 12,
-        "y": 27
-      },
+      "datasource": {"type": "postgres", "uid": "smoke_pg"},
+      "fieldConfig": {"defaults": {}, "overrides": []},
+      "gridPos": {"h": 9, "w": 12, "x": 12, "y": 39},
       "id": 7,
-      "options": {
-        "showHeader": true
-      },
+      "options": {"showHeader": true},
       "targets": [
         {
-          "datasource": {
-            "type": "postgres",
-            "uid": "smoke_pg"
-          },
+          "datasource": {"type": "postgres", "uid": "smoke_pg"},
           "editorMode": "code",
           "format": "table",
           "rawQuery": true,
@@ -254,30 +278,14 @@
       "type": "table"
     },
     {
-      "datasource": {
-        "type": "postgres",
-        "uid": "smoke_pg"
-      },
-      "fieldConfig": {
-        "defaults": {},
-        "overrides": []
-      },
-      "gridPos": {
-        "h": 8,
-        "w": 24,
-        "x": 0,
-        "y": 36
-      },
+      "datasource": {"type": "postgres", "uid": "smoke_pg"},
+      "fieldConfig": {"defaults": {}, "overrides": []},
+      "gridPos": {"h": 8, "w": 24, "x": 0, "y": 48},
       "id": 8,
-      "options": {
-        "showHeader": true
-      },
+      "options": {"showHeader": true},
       "targets": [
         {
-          "datasource": {
-            "type": "postgres",
-            "uid": "smoke_pg"
-          },
+          "datasource": {"type": "postgres", "uid": "smoke_pg"},
           "editorMode": "code",
           "format": "table",
           "rawQuery": true,
@@ -291,22 +299,13 @@
   ],
   "refresh": "30s",
   "schemaVersion": 39,
-  "tags": [
-    "smoke",
-    "wildfire",
-    "phase2"
-  ],
-  "templating": {
-    "list": []
-  },
-  "time": {
-    "from": "now-7d",
-    "to": "now"
-  },
+  "tags": ["smoke", "wildfire", "phase3"],
+  "templating": {"list": []},
+  "time": {"from": "now-7d", "to": "now"},
   "timepicker": {},
   "timezone": "browser",
-  "title": "Wildfire Smoke Risk (Phase 2)",
+  "title": "Wildfire Smoke Risk (Phase 3)",
   "uid": "wildfire-smoke-phase2",
-  "version": 1,
+  "version": 2,
   "weekStart": ""
 }
