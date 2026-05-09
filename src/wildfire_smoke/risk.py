@@ -136,3 +136,59 @@ def compute_risk_score_v2_fields(
     }
 
     return score, risk_band(score), explanation
+
+
+def compute_risk_score_v3_fields(
+    *,
+    fire_inside_count: int,
+    nearby_fire_count: int,
+    max_frp: float | None,
+    avg_pm25: float | None,
+    avg_pm10: float | None,
+    newest_fire_observed_at: datetime | None,
+    window_end: datetime,
+    max_plume_exposure_score: float,
+    plume_detection_count: int,
+    wind_model_version: str,
+) -> tuple[float, str, dict]:
+    """
+    Engineering smoke-risk index v3 = v2 base blended with a wind-corridor plume signal.
+
+    ``max_plume_exposure_score`` comes from ``analytics.smoke_plume_exposures`` (``wind_v1``).
+
+        plume_component = min(1, max_plume_exposure_score / 100)
+        risk_score = min(100, 0.75 * base_v2_score + 25 * plume_component)
+
+    Not a health advisory.
+    """
+
+    base_v2_score, _band2, expl_v2 = compute_risk_score_v2_fields(
+        fire_inside_count=fire_inside_count,
+        nearby_fire_count=nearby_fire_count,
+        max_frp=max_frp,
+        avg_pm25=avg_pm25,
+        avg_pm10=avg_pm10,
+        newest_fire_observed_at=newest_fire_observed_at,
+        window_end=window_end,
+    )
+
+    plume_component = min(1.0, max(max_plume_exposure_score, 0.0) / 100.0)
+    risk_score = min(100.0, 0.75 * base_v2_score + 25.0 * plume_component)
+    band = risk_band(risk_score)
+
+    components = dict(expl_v2["components"])
+    components["plume"] = plume_component
+
+    explanation = {
+        **expl_v2,
+        "model_version": "v3",
+        "base_v2_score": base_v2_score,
+        "components": components,
+        "plume_component": plume_component,
+        "max_plume_exposure_score": max_plume_exposure_score,
+        "plume_detection_count": plume_detection_count,
+        "wind_model_version": wind_model_version,
+        "v3_formula": "min(100, 0.75 * base_v2_score + 25 * plume_component)",
+    }
+
+    return risk_score, band, explanation

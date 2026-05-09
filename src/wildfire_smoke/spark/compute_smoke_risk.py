@@ -10,7 +10,7 @@ from psycopg.rows import dict_row
 from psycopg.types.json import Json
 
 from wildfire_smoke.db.connection import connect
-from wildfire_smoke.risk import compute_risk_score_fields, compute_risk_score_v2_fields
+from wildfire_smoke.risk import compute_risk_score_fields, compute_risk_score_v2_fields, compute_risk_score_v3_fields
 from wildfire_smoke.settings import Settings, kafka_topics
 
 log = logging.getLogger(__name__)
@@ -244,6 +244,29 @@ def _v2_sql_params(window_start: datetime, window_end: datetime, radius_m: float
     )
 
 
+WIND_PLUME_MODEL_VERSION = "wind_v1"
+
+
+def _plume_max_by_geography(conn, window_start: datetime, window_end: datetime) -> dict[tuple[str, str], tuple[float, int]]:
+    with conn.cursor(row_factory=dict_row) as cur:
+        cur.execute(
+            """
+            SELECT geography_type, geoid,
+                   COALESCE(MAX(exposure_score), 0)::double precision AS max_plume,
+                   COUNT(DISTINCT detection_id)::int AS det_count
+            FROM analytics.smoke_plume_exposures
+            WHERE window_start = %s AND window_end = %s AND model_version = %s
+            GROUP BY geography_type, geoid
+            """,
+            (window_start, window_end, WIND_PLUME_MODEL_VERSION),
+        )
+        rows = cur.fetchall()
+    out: dict[tuple[str, str], tuple[float, int]] = {}
+    for r in rows:
+        out[(str(r["geography_type"]), str(r["geoid"]))] = (float(r["max_plume"]), int(r["det_count"]))
+    return out
+
+
 def _has_activity_v2(row: dict) -> bool:
     fi = int(row.get("fire_inside_count") or 0)
     nf = int(row.get("nearby_fire_count") or 0)
@@ -322,7 +345,7 @@ def main() -> None:
                     cur.execute(TRACT_V1_SQL, (window_start, window_end, window_start, window_end))
                     for r in cur.fetchall():
                         rows_out.append({**dict(r), "geography_type": "tract"})
-            elif model_version == "v2":
+            elif model_version in {"v2", "v3"}:
                 params = _v2_sql_params(window_start, window_end, radius_m)
                 if geographies in {"county", "both"}:
                     cur.execute(COUNTY_V2_SQL, params)
@@ -346,6 +369,11 @@ def main() -> None:
         bootstrap_servers=[s.strip() for s in kafka_servers.split(",") if s.strip()],
         value_serializer=lambda v: json.dumps(v, default=str).encode("utf-8"),
     )
+
+    plume_by_geo: dict[tuple[str, str], tuple[float, int]] = {}
+    if model_version == "v3":
+        with connect(settings) as conn:
+            plume_by_geo = _plume_max_by_geography(conn, window_start, window_end)
 
     with connect(settings) as conn:
         with conn.cursor() as cur:
@@ -374,7 +402,7 @@ def main() -> None:
                     aq_observation_count = int(r.get("aq_observation_count") or 0)
                     newest_aq = r.get("newest_aq_observed_at")
                     newest_fire = r.get("newest_fire_observed_at")
-                else:
+                elif model_version == "v2":
                     fire_inside = int(r["fire_inside_count"] or 0)
                     nearby_fire_count = int(r["nearby_fire_count"] or 0)
                     max_frp = float(r["max_frp"]) if r.get("max_frp") is not None else None
@@ -389,6 +417,30 @@ def main() -> None:
                         avg_pm10=avg_pm10,
                         newest_fire_observed_at=newest_fire,
                         window_end=window_end,
+                    )
+                    fire_count = fire_inside
+                    nearest_fire_km = float(r["nearest_fire_km"]) if r.get("nearest_fire_km") is not None else None
+                    aq_observation_count = int(r.get("aq_observation_count") or 0)
+                    newest_aq = r.get("newest_aq_observed_at")
+                else:
+                    fire_inside = int(r["fire_inside_count"] or 0)
+                    nearby_fire_count = int(r["nearby_fire_count"] or 0)
+                    max_frp = float(r["max_frp"]) if r.get("max_frp") is not None else None
+                    avg_pm25 = float(r["avg_pm25"]) if r.get("avg_pm25") is not None else None
+                    avg_pm10 = float(r["avg_pm10"]) if r.get("avg_pm10") is not None else None
+                    newest_fire = r.get("newest_fire_observed_at")
+                    max_plume, det_plume = plume_by_geo.get((geo_type, geoid), (0.0, 0))
+                    risk_score, risk_band_val, explanation = compute_risk_score_v3_fields(
+                        fire_inside_count=fire_inside,
+                        nearby_fire_count=nearby_fire_count,
+                        max_frp=max_frp,
+                        avg_pm25=avg_pm25,
+                        avg_pm10=avg_pm10,
+                        newest_fire_observed_at=newest_fire,
+                        window_end=window_end,
+                        max_plume_exposure_score=max_plume,
+                        plume_detection_count=det_plume,
+                        wind_model_version=WIND_PLUME_MODEL_VERSION,
                     )
                     fire_count = fire_inside
                     nearest_fire_km = float(r["nearest_fire_km"]) if r.get("nearest_fire_km") is not None else None
