@@ -9,6 +9,15 @@ POSTGRES_DB="${POSTGRES_DB:-smoke}"
 
 COMPOSE="${COMPOSE:-docker compose}"
 
+echo "Applying SQL migrations from sql/migrations..."
+shopt -s nullglob
+for f in "${ROOT_DIR}/sql/migrations/"*.sql; do
+  [[ -f "${f}" ]] || continue
+  echo "  -> $(basename "${f}")"
+  ${COMPOSE} exec -T postgres psql -v ON_ERROR_STOP=1 -U "${POSTGRES_USER}" -d "${POSTGRES_DB}" -f - <"${f}"
+done
+shopt -u nullglob
+
 echo "Applying SQL views from sql/views..."
 for f in "${ROOT_DIR}/sql/views/"*.sql; do
   [[ -f "${f}" ]] || continue

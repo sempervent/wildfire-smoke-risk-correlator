@@ -11,6 +11,8 @@ from typing import Any
 import httpx
 from kafka import KafkaProducer
 
+from wildfire_smoke.db.connection import connect
+from wildfire_smoke.ingestion_runs import create_run, finish_run
 from wildfire_smoke.logging import configure_logging
 from wildfire_smoke.openaq_records import normalized_measurement_fields, parse_openaq_datetime
 from wildfire_smoke.settings import Settings, kafka_topics, load_yaml_config, repo_root
@@ -193,6 +195,20 @@ def _coords_from_location(location: dict[str, Any]) -> tuple[float, float]:
     return float(lat), float(lon)
 
 
+def _openaq_ingestion_config(settings: Settings, cfg: dict[str, Any]) -> dict[str, Any]:
+    out: dict[str, Any] = {
+        "openaq_bbox": settings.openaq_bbox,
+        "measurements_hours_back": int(cfg["measurements_hours_back"]),
+        "parameter_ids": [int(x) for x in cfg["parameter_ids"]],
+        "locations_limit": int(cfg["locations_limit"]),
+        "measurements_limit": int(cfg["measurements_limit"]),
+        "max_pages": int(cfg["max_pages"]),
+    }
+    if settings.openaq_dry_run:
+        out["fixture_path"] = str(_resolve_path(settings.openaq_fixture_jsonl))
+    return out
+
+
 def main() -> None:
     configure_logging(os.environ.get("LOG_LEVEL", "INFO"))
     settings = Settings.from_env()
@@ -200,127 +216,184 @@ def main() -> None:
     cfg = load_yaml_config("sources.yaml")["openaq"]
 
     producer = _producer(settings)
+    mode = "dry_run" if settings.openaq_dry_run else "live"
+    ingestion_cfg = _openaq_ingestion_config(settings, cfg)
 
-    if settings.openaq_dry_run:
-        fixture = _resolve_path(settings.openaq_fixture_jsonl)
-        if not fixture.exists():
-            raise FileNotFoundError(f"OpenAQ fixture JSONL not found: {fixture}")
-        fetched_at = datetime.now(timezone.utc).isoformat()
-        log.info("openaq_dry_run_enabled", extra={"fixture": str(fixture)})
-        sent = 0
-        for line in fixture.read_text(encoding="utf-8").splitlines():
-            line = line.strip()
-            if not line:
-                continue
-            envelope = json.loads(line)
-            producer.send(topics["openaq_raw_topic"], value=envelope)
-            sent += 1
-        producer.flush()
-        log.info("openaq_publish_complete", extra={"sent": sent})
-        return
+    run_id = None
+    records_fetched = 0
+    records_published = 0
+    records_failed = 0
 
-    base_url = str(cfg["base_url"]).rstrip("/")
-    headers = _headers(settings)
+    try:
+        with connect(settings) as conn:
+            run_id = create_run(conn, source="openaq", mode=mode, config=ingestion_cfg)
 
-    hours_back = int(cfg["measurements_hours_back"])
-    datetime_min = (datetime.now(timezone.utc) - timedelta(hours=hours_back)).strftime("%Y-%m-%dT%H:%M:%SZ")
+        if settings.openaq_dry_run:
+            fixture = _resolve_path(settings.openaq_fixture_jsonl)
+            if not fixture.exists():
+                raise FileNotFoundError(f"OpenAQ fixture JSONL not found: {fixture}")
+            fetched_at = datetime.now(timezone.utc).isoformat()
+            log.info("openaq_dry_run_enabled", extra={"fixture": str(fixture)})
+            for line in fixture.read_text(encoding="utf-8").splitlines():
+                line = line.strip()
+                if not line:
+                    continue
+                envelope = json.loads(line)
+                records_fetched += 1
+                try:
+                    producer.send(topics["openaq_raw_topic"], value=envelope)
+                    records_published += 1
+                except Exception as exc:
+                    records_failed += 1
+                    log.exception("openaq_publish_failed", extra={"error": str(exc)})
+                    raise RuntimeError(
+                        f"OpenAQ fixture publish failed after {records_published} successes "
+                        f"({records_failed} failures)"
+                    ) from exc
+            producer.flush()
+            log.info("openaq_publish_complete", extra={"sent": records_published})
+        else:
+            base_url = str(cfg["base_url"]).rstrip("/")
+            headers = _headers(settings)
 
-    locations_limit = int(cfg["locations_limit"])
-    measurements_limit = int(cfg["measurements_limit"])
-    max_pages = int(cfg["max_pages"])
-    parameter_ids = [int(x) for x in cfg["parameter_ids"]]
+            hours_back = int(cfg["measurements_hours_back"])
+            datetime_min = (datetime.now(timezone.utc) - timedelta(hours=hours_back)).strftime("%Y-%m-%dT%H:%M:%SZ")
 
-    fetched_at = datetime.now(timezone.utc).isoformat()
+            locations_limit = int(cfg["locations_limit"])
+            measurements_limit = int(cfg["measurements_limit"])
+            max_pages = int(cfg["max_pages"])
+            parameter_ids = [int(x) for x in cfg["parameter_ids"]]
 
-    with httpx.Client() as client:
-        for parameter_id in parameter_ids:
-            pname = _parameter_name(parameter_id)
-            locations = _iter_locations_pages(
-                client,
-                base_url=base_url,
-                headers=headers,
-                bbox=settings.openaq_bbox,
-                parameter_id=parameter_id,
-                limit=locations_limit,
-                max_pages=max_pages,
-            )
-            log.info(
-                "openaq_locations_fetched",
-                extra={"parameter": pname, "parameter_id": parameter_id, "count": len(locations)},
-            )
+            fetched_at = datetime.now(timezone.utc).isoformat()
 
-            for loc in locations:
-                location_id = str(loc.get("id"))
-
-                lat, lon = _coords_from_location(loc)
-
-                sensors = loc.get("sensors") or []
-                matching_sensor_ids: list[str] = []
-                for sensor in sensors:
-                    param = sensor.get("parameter") or {}
-                    if int(param.get("id")) != parameter_id:
-                        continue
-                    matching_sensor_ids.append(str(sensor["id"]))
-
-                for sensor_id in matching_sensor_ids:
-                    measurements = _iter_sensor_measurements(
+            with httpx.Client() as client:
+                for parameter_id in parameter_ids:
+                    pname = _parameter_name(parameter_id)
+                    locations = _iter_locations_pages(
                         client,
                         base_url=base_url,
                         headers=headers,
-                        sensor_id=sensor_id,
-                        measurements_limit=measurements_limit,
+                        bbox=settings.openaq_bbox,
+                        parameter_id=parameter_id,
+                        limit=locations_limit,
                         max_pages=max_pages,
-                        datetime_min=datetime_min,
+                    )
+                    log.info(
+                        "openaq_locations_fetched",
+                        extra={"parameter": pname, "parameter_id": parameter_id, "count": len(locations)},
                     )
 
-                    for m in measurements:
-                        period = m.get("period") or {}
-                        dt_obj = period.get("datetimeFrom") or period.get("datetime_to") or period.get("datetimeTo")
-                        if isinstance(dt_obj, dict):
-                            dt_raw = dt_obj.get("utc") or dt_obj.get("local")
-                        else:
-                            dt_raw = dt_obj
-                        if not dt_raw:
-                            raise ValueError(f"Measurement missing datetime: sensor={sensor_id} payload={m}")
-                        measured_at = parse_openaq_datetime(str(dt_raw))
+                    for loc in locations:
+                        location_id = str(loc.get("id"))
 
-                        value_raw = m.get("value")
-                        if value_raw is None:
-                            continue
+                        lat, lon = _coords_from_location(loc)
 
-                        param_obj = m.get("parameter") or {}
-                        unit = str(param_obj.get("units") or "")
+                        sensors = loc.get("sensors") or []
+                        matching_sensor_ids: list[str] = []
+                        for sensor in sensors:
+                            param = sensor.get("parameter") or {}
+                            if int(param.get("id")) != parameter_id:
+                                continue
+                            matching_sensor_ids.append(str(sensor["id"]))
 
-                        normalized = normalized_measurement_fields(
-                            provider="openaq",
-                            location_id=location_id,
-                            sensor_id=sensor_id,
-                            parameter=pname,
-                            value=float(value_raw),
-                            unit=unit or "unknown",
-                            measured_at=measured_at,
-                            latitude=lat,
-                            longitude=lon,
-                        )
+                        for sensor_id in matching_sensor_ids:
+                            measurements = _iter_sensor_measurements(
+                                client,
+                                base_url=base_url,
+                                headers=headers,
+                                sensor_id=sensor_id,
+                                measurements_limit=measurements_limit,
+                                max_pages=max_pages,
+                                datetime_min=datetime_min,
+                            )
 
-                        record = {
-                            "location": {"id": location_id, "coordinates": {"latitude": lat, "longitude": lon}},
-                            "sensor_id": sensor_id,
-                            "parameter": pname,
-                            "measurement": m,
-                            "normalized": normalized,
-                        }
+                            for m in measurements:
+                                period = m.get("period") or {}
+                                dt_obj = (
+                                    period.get("datetimeFrom") or period.get("datetime_to") or period.get("datetimeTo")
+                                )
+                                if isinstance(dt_obj, dict):
+                                    dt_raw = dt_obj.get("utc") or dt_obj.get("local")
+                                else:
+                                    dt_raw = dt_obj
+                                if not dt_raw:
+                                    raise ValueError(f"Measurement missing datetime: sensor={sensor_id} payload={m}")
+                                measured_at = parse_openaq_datetime(str(dt_raw))
 
-                        envelope = {
-                            "source": "openaq",
-                            "fetched_at": fetched_at,
-                            "parameter": pname,
-                            "record": record,
-                        }
-                        producer.send(topics["openaq_raw_topic"], value=envelope)
+                                value_raw = m.get("value")
+                                if value_raw is None:
+                                    continue
 
-    producer.flush()
-    log.info("openaq_publish_complete")
+                                param_obj = m.get("parameter") or {}
+                                unit = str(param_obj.get("units") or "")
+
+                                normalized = normalized_measurement_fields(
+                                    provider="openaq",
+                                    location_id=location_id,
+                                    sensor_id=sensor_id,
+                                    parameter=pname,
+                                    value=float(value_raw),
+                                    unit=unit or "unknown",
+                                    measured_at=measured_at,
+                                    latitude=lat,
+                                    longitude=lon,
+                                )
+
+                                record = {
+                                    "location": {
+                                        "id": location_id,
+                                        "coordinates": {"latitude": lat, "longitude": lon},
+                                    },
+                                    "sensor_id": sensor_id,
+                                    "parameter": pname,
+                                    "measurement": m,
+                                    "normalized": normalized,
+                                }
+
+                                envelope = {
+                                    "source": "openaq",
+                                    "fetched_at": fetched_at,
+                                    "parameter": pname,
+                                    "record": record,
+                                }
+                                records_fetched += 1
+                                try:
+                                    producer.send(topics["openaq_raw_topic"], value=envelope)
+                                    records_published += 1
+                                except Exception as exc:
+                                    records_failed += 1
+                                    log.exception("openaq_publish_failed", extra={"error": str(exc)})
+                                    raise RuntimeError(
+                                        f"OpenAQ publish failed after {records_published} successes "
+                                        f"({records_failed} failures)"
+                                    ) from exc
+
+            producer.flush()
+            log.info("openaq_publish_complete")
+
+        if run_id is not None:
+            with connect(settings) as conn:
+                finish_run(
+                    conn,
+                    run_id,
+                    status="succeeded",
+                    records_fetched=records_fetched,
+                    records_published=records_published,
+                    records_failed=records_failed,
+                )
+    except Exception as exc:
+        if run_id is not None:
+            with connect(settings) as conn:
+                finish_run(
+                    conn,
+                    run_id,
+                    status="failed",
+                    records_fetched=records_fetched,
+                    records_published=records_published,
+                    records_failed=records_failed,
+                    error_message=str(exc)[:4000],
+                )
+        raise
 
 
 if __name__ == "__main__":
