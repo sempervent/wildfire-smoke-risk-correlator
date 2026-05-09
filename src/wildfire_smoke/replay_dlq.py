@@ -36,9 +36,9 @@ def replay_from_postgres(
     q = """
         SELECT parse_error_id, source_topic, payload_sample, error_context
         FROM analytics.parse_errors
-        WHERE status = %s
-          AND (%s IS NULL OR source_topic = %s)
-          AND (%s IS NULL OR target_dataset = %s)
+        WHERE status = %s::text
+          AND (%s::text IS NULL OR source_topic = %s::text)
+          AND (%s::text IS NULL OR target_dataset = %s::text)
         ORDER BY last_seen_at DESC
         LIMIT %s
         """
