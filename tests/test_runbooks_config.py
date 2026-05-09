@@ -1,10 +1,15 @@
 from __future__ import annotations
 
 from wildfire_smoke.runbooks import load_runbook_mappings, runbook_slug_for_alert_type
+
+
 def test_runbooks_yaml_maps_known_alert_types() -> None:
     m = load_runbook_mappings()
     assert "stale_firms_normalized" in m
     assert "no_recent_air_quality" in m
+    assert "kafka_lag_high" in m
+    assert "dlq_depth_high" in m
+    assert "replay_failures_recent" in m
     slug = runbook_slug_for_alert_type("high_smoke_risk", m)
     assert slug == "high-smoke-risk"
 

@@ -14,6 +14,8 @@ This repository implements a **Kafka + Spark + PostGIS** pipeline that correlate
 
 **Phase 7** adds **durable parse-error quarantine** (`analytics.parse_errors`), **Spark normalizer offset evidence** (`analytics.kafka_consumer_offsets`; distinct from broker-internal committed offsets unless unified later), **source-specific Kafka DLQs** plus a shared **`normalization.errors`** stream, **`make replay-bad-fixtures`** / **`make replay-dlq`** ( **`DRY_RUN=1` default** ), **`make dlq-smoke-test`** (bad fixtures + normalize + assertions), expanded **`make quality-check`** / **`make smoke-test`** hooks, **SQL + Grafana operational views**, and alert candidates **`parse_errors_high`**, **`parser_failure_spike`**, **`dlq_records_present`**, **`consumer_offset_stale`** with runbooks.
 
+**Phase 8** adds **bounded `WIND_BBOX` → NWS station discovery** (still overridden by **`WIND_STATION_IDS`**), **broker watermark + lag observations** (`analytics.kafka_topic_offsets`, `analytics.kafka_consumer_lag_observations`; distinct from Phase 7 application offsets), **`make collect-lag`** / **`make kafka-lag`**, **DLQ depth / pipeline lag SQL views**, **durable DLQ replay bookkeeping** (`analytics.dlq_replay_runs`, `analytics.dlq_replay_items`), **parse-error compaction / archival** (`make parse-errors-compact`, **`DRY_RUN=1` default**), **env-linked parser spike + lag + DLQ depth thresholds**, new alert candidates **`kafka_lag_high`**, **`dlq_depth_high`**, **`replay_failures_recent`**, **`COLLECT_LAG`** near the end of **`make operational-cycle`** (non-fatal unless **`STRICT_LAG_COLLECTION=1`**), and Grafana tables for lag / replay visibility.
+
 Wind direction uses the **meteorological convention** (*wind FROM*); modeled smoke transport uses the **opposite bearing** (see `src/wildfire_smoke/wind.py`).
 
 **Important:** the risk score is a **demonstration / operations correlation index**, not a health advisory model.
@@ -22,7 +24,7 @@ Wind direction uses the **meteorological convention** (*wind FROM*); modeled smo
 
 - **Ingest** FIRMS CSV hotspot rows into Kafka (`firms.hotspots.raw`).
 - **Ingest** OpenAQ v3 measurements into Kafka (`openaq.measurements.raw`).
-- **Ingest** wind observations into Kafka (`weather.wind.raw`; fixtures via **`WIND_DRY_RUN=1`**, or bounded **NWS** adapter via **`WIND_STATION_IDS`**).
+- **Ingest** wind observations into Kafka (`weather.wind.raw`; fixtures via **`WIND_DRY_RUN=1`**, or bounded **NWS** adapter via **`WIND_STATION_IDS`** or **`WIND_BBOX`** station discovery with **`WIND_STATION_DISCOVERY_LIMIT`**).
 - **Normalize** Kafka messages into PostGIS tables (`normalized.*`) using Spark batch jobs, including **spatial association** to `geo.counties` / `geo.tracts`.
 - **Compute** configurable-window risk scores into `analytics.smoke_risk_scores` (models **v1**, **v2**, and optional **`v3`**) and publish JSON snapshots to Kafka (`smoke.risk.scores`).
 - **Compute** optional **`wind_v1` plume corridor exposures** (`make compute-plume`) for geography-linked smoke-transport visualization (engineering heuristic only).
@@ -184,9 +186,9 @@ make grafana-up
 ### Alerting / SLIs (SQL-first)
 
 - **Views:** `analytics.v_sli_*` surface ingestion failures, freshness ages, sparse recent rows, and high-risk rows.
-- **Candidates:** `analytics.fn_alert_candidates(warn_h, crit_h, risk_min, lookback_h, high_plume_min, parse_err_warn, parse_err_crit, offset_stale_h)` unions actionable rows; `analytics.v_alert_candidates` uses defaults `(6, 24, 75, 24, 70, 1, 25, 6)` for the Phase 7 tail (override via env in `scripts/check_alerts.sh`).
+- **Candidates:** `analytics.fn_alert_candidates(...)` unions actionable rows with **14** threshold parameters (freshness, risk/plume, parse-error counts, consumer-offset stale hours, parser spike counts, Kafka lag message floors, DLQ depth proxy floors — see `scripts/check_alerts.sh` / `wildfire_smoke.alert_thresholds`). `analytics.v_alert_candidates` applies SQL defaults on the function (CLI passes env-derived values).
 - **CLI:** `make alerts-check` prints candidates and exits **2** if any **`severity = critical`** exists. Set **`ALERTS_WARN_ONLY=1`** to always exit 0 (recommended for fixture demos where timestamps are intentionally stale).
-- **Threshold env:** `ALERT_FRESHNESS_WARN_HOURS` (default 6), `ALERT_FRESHNESS_CRITICAL_HOURS` (24), `ALERT_HIGH_RISK_MIN_SCORE` (75), `ALERT_LOOKBACK_HOURS` (24), `ALERT_HIGH_PLUME_EXPOSURE_MIN_SCORE` (70), `ALERT_PARSE_ERRORS_WARN_COUNT` (1), `ALERT_PARSE_ERRORS_CRITICAL_COUNT` (25), `ALERT_CONSUMER_OFFSET_STALE_HOURS` (6).
+- **Threshold env:** `ALERT_FRESHNESS_WARN_HOURS` (default 6), `ALERT_FRESHNESS_CRITICAL_HOURS` (24), `ALERT_HIGH_RISK_MIN_SCORE` (75), `ALERT_LOOKBACK_HOURS` (24), `ALERT_HIGH_PLUME_EXPOSURE_MIN_SCORE` (70), `ALERT_PARSE_ERRORS_WARN_COUNT` (1), `ALERT_PARSE_ERRORS_CRITICAL_COUNT` (25), `ALERT_CONSUMER_OFFSET_STALE_HOURS` (6), `ALERT_PARSER_SPIKE_WARN_COUNT` (15), `ALERT_PARSER_SPIKE_CRITICAL_COUNT` (40), `ALERT_KAFKA_LAG_WARN_MESSAGES` (100), `ALERT_KAFKA_LAG_CRITICAL_MESSAGES` (1000), `ALERT_DLQ_DEPTH_WARN_MESSAGES` (1), `ALERT_DLQ_DEPTH_CRITICAL_MESSAGES` (100).
 
 ### Phase 4 — persisted alerts, notifications, bounded live ingest
 
@@ -242,6 +244,8 @@ make operational-cycle LIVE_MODE=1
 `LIVE_MODE=0` defaults `ALERTS_WARN_ONLY=1` for downstream tooling consistency (the cycle itself runs quality-check + alert materialization rather than `alerts-check`).
 
 Phase 5 records each fixture/live cycle into **`analytics.operational_runs`** with JSON **`steps`** (names/status/timestamps only—no secrets).
+
+Phase 8 appends a **`collect_lag`** step when **`COLLECT_LAG=1`** (default **1**): `scripts/collect_kafka_lag.sh` snapshots broker highs and approximate lag vs application offsets. Failures are **`warn`** unless **`STRICT_LAG_COLLECTION=1`**. Alerts are materialized **after** lag collection so **`kafka_lag_high`** / **`dlq_depth_high`** candidates can appear in the same cycle.
 
 ### Phase 5 — notification reliability, digest, scheduling
 
@@ -353,6 +357,29 @@ This wipes the Postgres volume, recreates topics, re-downloads Census data for t
 - Postgres replay uses **`payload_sample`** (may be truncated); Kafka DLQ replay uses **`original_payload`** from the envelope when available.
 - **`consumer_offset_stale`** warns when **no** `spark-normalize%` evidence exists yet (common before the first successful normalization on a fresh volume).
 
+## Phase 8 — broker lag, DLQ depth, replay bookkeeping, wind discovery
+
+**Wind**
+
+- Set **`WIND_BBOX=min_lon,min_lat,max_lon,max_lat`** for bounded **NWS `/stations`** discovery (paginated, capped by **`WIND_STATION_DISCOVERY_LIMIT`**, default **25**). **`WIND_STATION_IDS`** still wins when non-empty.
+- Discovery reuses **`LIVE_INGEST_MAX_SPAN_DEG`** / **`LIVE_INGEST_ALLOW_LARGE_BBOX`** guards (same semantics as live FIRMS/OpenAQ bbox safety).
+- Optional **`WIND_STATION_DISCOVERY_RADIUS_KM`** expands matching to stations near (but outside) the bbox.
+- Tests and dry workflows can set **`NWS_STATIONS_FIXTURE_JSON`** to a repo JSON fixture (no network). Live calls should set a descriptive **`NWS_USER_AGENT`** (a default string logs a warning).
+
+**Broker vs application offsets**
+
+- **`analytics.kafka_consumer_offsets`** (Phase 7): Spark normalizer **application evidence**.
+- **`analytics.kafka_topic_offsets`** / **`analytics.kafka_consumer_lag_observations`** (Phase 8): broker **high watermarks** and **approximate lag** (`high_watermark - application current_offset` per sampled row). Treat as operational telemetry, not a substitute for Kafka consumer-group tooling.
+
+**Operational scripts**
+
+- **`make collect-lag`** / **`make kafka-lag`**: run `scripts/collect_kafka_lag.sh` → `python -m wildfire_smoke.kafka_lag`.
+- **`make parse-errors-compact`**: `scripts/compact_parse_errors.sh` — summarizes aged rows by default (`DRY_RUN=1`); **`DRY_RUN=0 --no-dry-run`** marks matching **`resolved`** (or configured status) rows **`archived`** (no deletes).
+
+**DLQ replay audit**
+
+- **`DLQ_REPLAY_BOOKKEEPING=1`** (default): each **`replay-dlq`** run inserts **`analytics.dlq_replay_runs`** + per-row **`analytics.dlq_replay_items`** (`planned` / `skipped` / `replayed` / `failed`). **`DLQ_RESOLVE_ON_REPLAY=1`** increments **`records_resolved`** when Postgres rows move to **`resolved`**.
+
 ## Makefile targets
 
 | Target          | Purpose                                              |
@@ -374,7 +401,9 @@ This wipes the Postgres volume, recreates topics, re-downloads Census data for t
 | `make replay-dlq` | **`scripts/replay_dlq.sh`** — DLQ / `parse_errors` replay (**`DRY_RUN=1` default**) |
 | `make dlq-smoke-test` | Bad fixtures + normalize + assert **`parse_errors`** + dry-run replay |
 | `make parse-errors` | Print **`analytics.v_parse_error_summary`** |
+| `make parse-errors-compact` | Summarize / optionally archive aged **`parse_errors`** (**`DRY_RUN=1` default**) |
 | `make consumer-offsets` | Print **`analytics.v_consumer_offset_state`** |
+| `make collect-lag` / `make kafka-lag` | Snapshot broker highs + approximate lag into **`analytics.kafka_*_lag*`** tables |
 | `make smoke-transport-demo` | Replay fixtures + optional **`SMOKE_RISK_MODEL_VERSION=v3`** risk pass |
 | `make quality-check`  | DB / geometry / duplicate-ID structural checks   |
 | `make grafana-up`     | Start Grafana (`--profile grafana`)              |
@@ -422,6 +451,7 @@ Stable analytics views for dashboards include:
 - **Phase 3 maps:** `analytics.v_latest_smoke_risk_county_geojson`, `analytics.v_latest_smoke_risk_tract_geojson`, `analytics.v_latest_fire_detections_geojson`, `analytics.v_latest_air_quality_geojson`
 - **Phase 6 transport:** `analytics.v_latest_wind_observations`, `analytics.v_latest_wind_observations_geojson`, `analytics.v_latest_smoke_plume_exposures`, `analytics.v_top_plume_exposures`, `analytics.v_latest_smoke_risk_v3`, `analytics.v_smoke_transport_summary`
 - **Phase 7 DLQ / offsets:** `analytics.v_parse_errors_open`, `analytics.v_parse_error_summary`, `analytics.v_parse_errors_recent`, `analytics.v_consumer_offset_state`, `analytics.v_dlq_operational_summary`
+- **Phase 8 lag / replay:** `analytics.v_kafka_topic_depth`, `analytics.v_consumer_lag_latest`, `analytics.v_dlq_topic_depth`, `analytics.v_pipeline_lag_summary`, `analytics.v_dlq_replay_runs`, `analytics.v_dlq_replay_items_recent`
 - **Phase 3 SLIs / alerts:** `analytics.v_sli_*`, `analytics.v_alert_candidates`, `analytics.fn_alert_candidates(...)`
 
 Producer runs append rows to **`analytics.ingestion_runs`** (`run_id`, `source`, `mode` `live|dry_run`, counts, `config` JSON without secrets, `error_message` on failure).
@@ -488,7 +518,7 @@ Run **`SMOKE_RISK_MODEL_VERSION=v1`** or **`=v3`** to compare models on the same
 
 ## Known limitations
 
-- **Wind live adapter**: bounding-box station discovery is **not implemented** in v1 — set **`WIND_STATION_IDS`** (comma-separated ICAO ids) for live NWS pulls; respect NWS **`User-Agent`** guidance via **`NWS_USER_AGENT`**.
+- **Wind live adapter**: use **`WIND_STATION_IDS`** or bounded **`WIND_BBOX`** discovery (`WIND_STATION_DISCOVERY_LIMIT`, optional `WIND_STATION_DISCOVERY_RADIUS_KM`). Respect NWS **`User-Agent`** guidance via **`NWS_USER_AGENT`**. Discovery lists stations whose coordinates fall inside the bbox (plus optional radius buffer), not a full mesonet inventory — narrow bbox when possible.
 - **`wind_v1` plume rows** require overlapping **fire detections**, **wind directions**, and census geometries — fixture demos may legitimately yield **zero** `analytics.smoke_plume_exposures` rows if timestamps/geometries do not intersect.
 - **Alert overlap**: an empty wind table can surface **both** `wind_data_stale` and `no_recent_wind_data`—similar to the FIRMS/OpenAQ freshness/no-row pairing.
 - **Grafana polygon provisioning**: centroid marker maps are the supported default; full GeoJSON polygon styling may require manual panel tuning beyond checked-in JSON.

@@ -39,3 +39,12 @@ mappings:
   consumer_offset_stale:
     slug: consumer-offset-stale
     path: docs/runbooks/consumer-offset-stale.md
+  kafka_lag_high:
+    slug: kafka-lag-high
+    path: docs/runbooks/kafka-lag-high.md
+  dlq_depth_high:
+    slug: dlq-depth-high
+    path: docs/runbooks/dlq-depth-high.md
+  replay_failures_recent:
+    slug: replay-failures-recent
+    path: docs/runbooks/replay-failures-recent.md

@@ -11,7 +11,7 @@ This repository is a **local-first vertical slice** for correlating NASA FIRMS h
 - **Risk disclaimer:** scores are an **engineering correlation index**, not a public-health advisory—for **v1**, **v2**, and **v3**.
 - **Meteorological wind convention:** treat **`wind_direction_degrees` as wind FROM** (origin bearing). Modeled smoke transport uses the **downwind / opposite bearing**—preserve this invariant in math and docs (`src/wildfire_smoke/wind.py`).
 - **Plume model honesty:** `wind_v1` / `analytics.smoke_plume_exposures` is a **simple corridor heuristic**, not atmospheric dispersion, CFD, or epidemiology—never imply clinical/air-quality advisory accuracy from these scores alone.
-- **Wind fixtures stay no-secrets:** `WIND_DRY_RUN=1` + checked-in JSONL must remain runnable without API keys; live wind pulls stay **bounded** (`WIND_STATION_IDS`, documented limitations—no “fetch all CONUS stations” defaults).
+- **Wind fixtures stay no-secrets:** `WIND_DRY_RUN=1` + checked-in JSONL must remain runnable without API keys; live wind pulls stay **bounded** (`WIND_STATION_IDS` **or** `WIND_BBOX` discovery with **`WIND_STATION_DISCOVERY_LIMIT`**, optional radius buffer—never “fetch all CONUS stations” defaults).
 - **Network notifier tests:** mock HTTP/SMTP transports—do not rely on live external calls in unit tests.
 - **Dashboard GeoJSON views are presentation-only.** Canonical geometries live in **`geo.counties` / `geo.tracts`** (and point rows in **`normalized.*`**). Do not treat `analytics.v_latest_*_geojson` as authoritative storage.
 - **No local default should pull all US tracts.** Multi-state tract downloads are explicit (`CENSUS_STATEFPS`, yaml `states:`); national tract imports are out of scope for the default workflow.
@@ -27,7 +27,10 @@ This repository is a **local-first vertical slice** for correlating NASA FIRMS h
 - **DLQ replay safety:** operator tooling defaults to **`DRY_RUN=1`** (`scripts/replay_dlq.sh`). Treat **`DLQ_RESOLVE_ON_REPLAY=1`** as explicit acknowledgement when republishing fixed payloads.
 - **No secrets in failure artifacts:** **`payload_sample`**, DLQ **`original_payload`**, and logs must stay free of API keys/tokens—use `wildfire_smoke.dlq.sanitize_payload_sample` patterns.
 - **Parser observability:** classify failures (`error_class`) consistently so **`analytics.parse_errors`** and alerts remain aggregate-friendly.
-- **Offset concepts:** **`analytics.kafka_consumer_offsets`** is **application evidence** from Spark batch jobs; Kafka broker consumer-group commits are a separate mechanism unless explicitly unified in a future phase.
+- **Offset concepts:** **`analytics.kafka_consumer_offsets`** is **application evidence** from Spark batch jobs. **`analytics.kafka_topic_offsets`** / **`analytics.kafka_consumer_lag_observations`** store **broker watermark snapshots** and **application-observed lag** (high minus recorded offset)—do not conflate these with broker consumer-group commit lag unless tooling explicitly aligns them.
+- **Lag collection resilience:** `collect_kafka_lag` / operational **`collect_lag`** steps must **not** fail scheduled cycles by default; operators opt into hard failure via **`STRICT_LAG_COLLECTION=1`**.
+- **Replay bookkeeping:** `replay-dlq` defaults to **`DRY_RUN=1`**; **`DLQ_REPLAY_BOOKKEEPING`** defaults on — preserve audit rows instead of deleting parse-error history.
+- **Parse errors lifecycle:** **`parse-errors-compact`** defaults to **report-only** (`DRY_RUN=1`); avoid deleting **`parse_errors`** rows — archival to **`archived`** is explicit opt-in.
 
 ## Operating constraints
 
