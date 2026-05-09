@@ -1,6 +1,6 @@
 COMPOSE ?= docker compose
 
-.PHONY: up down reset db-bootstrap topics ingest-once normalize compute-risk smoke-test test deps quality-check replay-fixtures grafana-up refresh-mviews alerts-check demo
+.PHONY: up down reset db-bootstrap topics ingest-once ingest-live-once normalize compute-risk smoke-test test deps quality-check replay-fixtures grafana-up refresh-mviews alerts-check alerts-materialize alerts-send operational-cycle demo
 
 deps:
 	uv sync --extra dev
@@ -25,6 +25,9 @@ topics:
 ingest-once:
 	bash scripts/ingest_once.sh
 
+ingest-live-once:
+	bash scripts/live_ingest_once.sh
+
 normalize:
 	bash scripts/run_normalize.sh
 
@@ -45,6 +48,15 @@ refresh-mviews:
 
 alerts-check:
 	bash scripts/check_alerts.sh
+
+alerts-materialize:
+	bash scripts/materialize_alerts.sh
+
+alerts-send:
+	bash scripts/send_alerts.sh
+
+operational-cycle:
+	bash scripts/run_operational_cycle.sh
 
 demo:
 	bash scripts/demo_local.sh
