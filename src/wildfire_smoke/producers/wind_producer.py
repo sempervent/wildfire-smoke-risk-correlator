@@ -17,6 +17,7 @@ from wildfire_smoke.ingestion_runs import create_run, finish_run
 from wildfire_smoke.logging import configure_logging
 from wildfire_smoke.settings import Settings, kafka_topics, repo_root
 from wildfire_smoke.wind_records import normalized_wind_from_dict
+from wildfire_smoke.wind_station_discovery import resolve_wind_station_ids_for_live
 
 log = logging.getLogger(__name__)
 
@@ -164,17 +165,22 @@ def main() -> None:
             if settings.wind_source not in {"nws"}:
                 raise ValueError(f"Unsupported WIND_SOURCE for live mode: {settings.wind_source!r}")
 
-            if not settings.wind_station_ids:
+            station_ids = resolve_wind_station_ids_for_live(
+                wind_station_ids=settings.wind_station_ids,
+                wind_bbox_raw=settings.wind_bbox,
+            )
+            if not station_ids:
                 log.warning(
                     "wind_live_no_stations",
                     extra={
-                        "hint": "Set WIND_STATION_IDS (comma-separated ICAO ids, e.g. KTYS,KCHA). "
-                        "Bounding-box station discovery from WIND_BBOX is not implemented in v1."
+                        "hint": "Set WIND_STATION_IDS or WIND_BBOX with bounded NWS discovery "
+                        "(WIND_STATION_DISCOVERY_LIMIT, optional WIND_STATION_DISCOVERY_RADIUS_KM)."
                     },
                 )
             else:
+                log.info("wind_live_station_targets", extra={"count": len(station_ids), "stations": station_ids[:50]})
                 with httpx.Client() as client:
-                    for sid in settings.wind_station_ids:
+                    for sid in station_ids:
                         try:
                             lon, lat = _fetch_station_coords(client, sid)
                             obs = _fetch_latest_observation(client, sid)
@@ -191,7 +197,9 @@ def main() -> None:
 
         producer.flush()
 
-        live_attempted = not settings.wind_dry_run and bool(settings.wind_station_ids)
+        live_attempted = not settings.wind_dry_run and bool(
+            settings.wind_station_ids or (settings.wind_bbox and str(settings.wind_bbox).strip())
+        )
         ok = settings.wind_dry_run or sent > 0 or not live_attempted
         with connect(settings) as conn:
             finish_run(
