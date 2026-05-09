@@ -35,6 +35,8 @@ REQUIRED_TABLES=(
   "geo.tracts"
   "normalized.fire_detections"
   "normalized.air_quality_measurements"
+  "normalized.wind_observations"
+  "analytics.smoke_plume_exposures"
   "analytics.smoke_risk_scores"
   "analytics.ingestion_runs"
 )

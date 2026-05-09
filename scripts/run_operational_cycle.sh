@@ -54,6 +54,11 @@ step normalize start
 bash "${ROOT_DIR}/scripts/run_normalize.sh"
 step normalize ok
 
+echo "==> Compute plume exposures"
+step compute_plume start
+bash "${ROOT_DIR}/scripts/run_compute_plume.sh"
+step compute_plume ok
+
 echo "==> Compute risk"
 step compute_risk start
 bash "${ROOT_DIR}/scripts/run_compute_risk.sh"

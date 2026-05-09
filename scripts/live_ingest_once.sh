@@ -12,6 +12,7 @@ fi
 
 export FIRMS_DRY_RUN="${FIRMS_DRY_RUN:-0}"
 export OPENAQ_DRY_RUN="${OPENAQ_DRY_RUN:-0}"
+export WIND_DRY_RUN="${WIND_DRY_RUN:-0}"
 export KAFKA_BOOTSTRAP_SERVERS="${KAFKA_BOOTSTRAP_SERVERS:-localhost:19092}"
 
 DEFAULT_BBOX="-88.2,34.9,-81.6,36.7"
@@ -34,6 +35,9 @@ bash "${ROOT_DIR}/scripts/ingest_once.sh"
 
 echo "==> Normalize"
 bash "${ROOT_DIR}/scripts/run_normalize.sh"
+
+echo "==> Compute plume"
+bash "${ROOT_DIR}/scripts/run_compute_plume.sh"
 
 echo "==> Compute risk"
 bash "${ROOT_DIR}/scripts/run_compute_risk.sh"

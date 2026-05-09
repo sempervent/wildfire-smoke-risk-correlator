@@ -24,8 +24,9 @@ make topics
 echo "==> Demo: fixture replay (no API keys)"
 make replay-fixtures
 
-echo "==> Demo: normalize + risk (replay-fixtures may have run these; safe to repeat)"
+echo "==> Demo: normalize + plume + risk (replay-fixtures may have run these; safe to repeat)"
 make normalize
+make compute-plume
 make compute-risk
 
 echo "==> Demo: quality check"
