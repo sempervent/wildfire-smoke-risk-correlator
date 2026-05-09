@@ -75,6 +75,21 @@ bash -n "${ROOT_DIR}/scripts/run_operational_cycle.sh"
 bash -n "${ROOT_DIR}/scripts/live_ingest_once.sh"
 test -f "${ROOT_DIR}/docs/runbooks/alert-overview.md"
 
+echo "==> Phase 5 notification reliability surfaces"
+${COMPOSE} exec -T postgres psql -v ON_ERROR_STOP=1 -U "${POSTGRES_USER}" -d "${POSTGRES_DB}" -c \
+  "SELECT COUNT(*) FROM analytics.notification_attempts;"
+${COMPOSE} exec -T postgres psql -v ON_ERROR_STOP=1 -U "${POSTGRES_USER}" -d "${POSTGRES_DB}" -c \
+  "SELECT COUNT(*) FROM analytics.v_open_alert_events;"
+${COMPOSE} exec -T postgres psql -v ON_ERROR_STOP=1 -U "${POSTGRES_USER}" -d "${POSTGRES_DB}" -c \
+  "SELECT COUNT(*) FROM analytics.v_notification_attempt_summary;"
+${COMPOSE} exec -T postgres psql -v ON_ERROR_STOP=1 -U "${POSTGRES_USER}" -d "${POSTGRES_DB}" -c \
+  "SELECT COUNT(*) FROM analytics.v_recent_operational_cycles;"
+ALERT_NOTIFIER=console ALERT_DIGEST=1 ALERT_SEVERITY_MIN=warning bash "${ROOT_DIR}/scripts/send_alerts.sh" --digest
+ALERT_NOTIFIER=console ALERT_RETRY_QUEUE=1 bash "${ROOT_DIR}/scripts/send_alerts.sh" --retry-queue
+test -f "${ROOT_DIR}/docker/scheduler/loop.sh"
+test -f "${ROOT_DIR}/deploy/systemd/wildfire-smoke-operational.service"
+test -f "${ROOT_DIR}/deploy/systemd/wildfire-smoke-operational.timer"
+
 echo "==> alerts-check (warn-only; fixture data is often stale)"
 ALERTS_WARN_ONLY=1 bash "${ROOT_DIR}/scripts/check_alerts.sh"
 

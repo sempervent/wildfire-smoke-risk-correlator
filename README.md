@@ -8,6 +8,8 @@ This repository implements a **Kafka + Spark + PostGIS** pipeline that correlate
 
 **Phase 4** adds **`analytics.alert_events`** (stable fingerprints + deduped open incidents), **`make alerts-materialize`** / **`make alerts-send`** with **console / webhook / Slack / SMTP** notifiers, **operator runbooks** under `docs/runbooks/`, **bounded `make ingest-live-once`** (requires `FIRMS_MAP_KEY`; rejects huge bboxes unless explicitly allowed), and **`make operational-cycle`** for a repeatable fixture or live loop.
 
+**Phase 5** adds **`analytics.notification_attempts`** (durable delivery audit with **destination hashes**, safe errors, **retry_after**), **retry/backoff + max attempt caps**, **`make alerts-send-digest`** / **`make alerts-send-retry`**, **`analytics.operational_runs`** instrumentation from **`scripts/run_operational_cycle.sh`**, **operator evidence SQL views** (wired into Grafana tables), an **optional Compose `scheduler` profile** (`operational-scheduler` using **Docker CLI + socket**—treat as advanced), and **systemd unit/timer templates** under `deploy/systemd/`.
+
 **Important:** the risk score is a **demonstration / operations correlation index**, not a health advisory model.
 
 ## What this project does
@@ -221,6 +223,47 @@ make operational-cycle LIVE_MODE=1
 
 `LIVE_MODE=0` defaults `ALERTS_WARN_ONLY=1` for downstream tooling consistency (the cycle itself runs quality-check + alert materialization rather than `alerts-check`).
 
+Phase 5 records each fixture/live cycle into **`analytics.operational_runs`** with JSON **`steps`** (names/status/timestamps only—no secrets).
+
+### Phase 5 — notification reliability, digest, scheduling
+
+**Attempts table**
+
+- Each delivery creates rows in **`analytics.notification_attempts`** (`succeeded` / `failed` / `skipped`).
+- **`destination_hash`** hashes a normalized destination descriptor (never store raw webhook URLs or SMTP passwords).
+- Failures record **`error_class`** + truncated **`error_message`** safe for logs.
+
+**Retries**
+
+- Backoff after failures: **5m**, then **15m**, then **60m** (`retry_after` column).
+- **`ALERT_RETRY_DISABLED=1`** skips backoff gating (still enforces **`ALERT_MAX_ATTEMPTS`** unless you adjust workflow).
+- **`ALERT_MAX_ATTEMPTS`** (default **5**) counts non-`skipped` attempts per `(alert_event_id, notifier)`.
+- **`FORCE_NOTIFY=1`** bypasses “already sent for this `last_seen_at`” suppression via `notification_state`, but attempts are still logged.
+
+**Digest mode**
+
+- **`make alerts-send-digest`** sets **`ALERT_DIGEST=1`** and **`--digest`** (single summarized message per notifier invocation).
+- **`ALERT_DIGEST_WINDOW_HOURS`** (default **24**) filters digest inclusion by `observed_at`.
+- **`ALERT_DIGEST_MAX_ITEMS`** caps digest cardinality (default **50**).
+- Digest output calls out **severity counts**, **newest observed time**, **titles**, **geographies**, and **runbook slugs**, and explicitly tells operators to verify criticals in SQL—not a substitute for paging critical incidents.
+
+**Retry queue mode**
+
+- **`make alerts-send-retry`** sets **`ALERT_RETRY_QUEUE=1`** + **`--retry-queue`**, targeting alerts whose **latest** attempt for that notifier was **`failed`** (fresh retries still obey backoff unless disabled).
+
+**Rate limiting / cooldown**
+
+- **`ALERT_SEND_COOLDOWN_SECONDS`** (default **0**) suppresses *all* sends for a notifier if the latest attempt was within the cooldown window.
+
+**Scheduling**
+
+- **Recommended:** install `deploy/systemd/wildfire-smoke-operational.{service,timer}` on a host with Docker/Compose access, editing **`WorkingDirectory`** / **`EnvironmentFile`** to your checkout.
+- **Optional Compose:** `make operational-scheduler-up` starts **`operational-scheduler`** (`--profile scheduler`). It mounts **`/var/run/docker.sock`** and periodically `docker compose exec`s `spark-worker` to run `scripts/run_operational_cycle.sh` (fixture mode by default; set **`LIVE_MODE=1`** explicitly for live). This is **disabled by default** and should be treated as an advanced integration.
+
+**Grafana**
+
+- Dashboard panels query **`analytics.v_open_alert_events`**, **`v_notification_attempt_summary`**, **`v_notification_failures`**, **`v_alert_delivery_state`**, and **`v_recent_operational_cycles`**.
+
 **Runbooks**
 
 - Human procedures live under `docs/runbooks/` and are mapped from `alert_type` via `config/runbooks.yaml` into `alert_events.runbook_slug`.
@@ -279,8 +322,11 @@ This wipes the Postgres volume, recreates topics, re-downloads Census data for t
 | `make alerts-check`   | Print alert candidates; fail on **critical**    |
 | `make alerts-materialize` | Upsert `analytics.alert_events` from candidates |
 | `make alerts-send`    | Dispatch notifier for open incidents             |
+| `make alerts-send-digest` | Send one digest notification per notifier   |
+| `make alerts-send-retry` | Retry-queue filter (`last attempt failed`) |
 | `make ingest-live-once` | Bounded live producers + pipeline + alerts    |
 | `make operational-cycle` | Fixture replay **or** live ingest + batch jobs |
+| `make operational-scheduler-up` | Start Compose **`scheduler`** profile loop |
 | `make demo`           | No-secrets local demo (`replay-fixtures` path)   |
 | `make smoke-test`   | Run `scripts/smoke_test.sh`                      |
 | `make test`     | Run pytest                                           |

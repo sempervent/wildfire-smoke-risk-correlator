@@ -25,6 +25,7 @@ def _sample_row() -> AlertEventRow:
         first_seen_at=now,
         last_seen_at=now,
         details={"max_acq_datetime": "2024-01-01"},
+        runbook_slug="stale-firms-source",
     )
 
 
