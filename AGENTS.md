@@ -9,6 +9,10 @@ This repository is a **local-first vertical slice** for correlating NASA FIRMS h
 - **No-secret logging:** ingestion run **`config` JSONB** must never contain API keys or map keys; producers only record safe operational fields (bbox, sources, fixture paths, YAML limits).
 - **Additive migrations:** ship DDL under `sql/migrations/*.sql`; `scripts/bootstrap_db.sh` applies them before views. Keep `docker/postgres/initdb/` in sync for fresh volumes.
 - **Risk disclaimer:** scores are an **engineering correlation index**, not a public-health advisory—for both **v1** and **v2**.
+- **Dashboard GeoJSON views are presentation-only.** Canonical geometries live in **`geo.counties` / `geo.tracts`** (and point rows in **`normalized.*`**). Do not treat `analytics.v_latest_*_geojson` as authoritative storage.
+- **No local default should pull all US tracts.** Multi-state tract downloads are explicit (`CENSUS_STATEFPS`, yaml `states:`); national tract imports are out of scope for the default workflow.
+- **Alerts are SQL-first.** Ship inspectable views/functions (`analytics.fn_alert_candidates`, `v_sli_*`) before wiring external notification systems.
+- **Fixture demo path stays no-secrets:** `make demo` / `make replay-fixtures` must never require `FIRMS_MAP_KEY` or `OPENAQ_API_KEY`.
 
 ## Operating constraints
 
@@ -28,6 +32,7 @@ This repository is a **local-first vertical slice** for correlating NASA FIRMS h
 - **Analytical SQL**: `sql/views/*.sql`, `sql/queries/*.sql`
 - **Quality / replay**: `scripts/quality_check.sh`, `scripts/replay_fixtures.sh`
 - **Grafana**: `docker/grafana/provisioning/`, `docker/grafana/dashboards/`
+- **Maps / SLIs (Phase 3)**: `sql/views/zzz_phase3_*.sql`, `scripts/check_alerts.sh`, `scripts/refresh_materialized_views.sh`, `scripts/demo_local.sh`, `src/wildfire_smoke/census_config.py`, `src/wildfire_smoke/alert_thresholds.py`
 
 ## Spark + Python imports
 
@@ -43,6 +48,11 @@ make up && make topics && make db-bootstrap
 make replay-fixtures
 make normalize && make compute-risk
 make quality-check && make smoke-test
+make alerts-check ALERTS_WARN_ONLY=1
+make refresh-mviews
+make grafana-up
 ```
 
-Optional: `make grafana-up` and confirm provisioning paths inside the container (`/etc/grafana/provisioning`, `/var/lib/grafana/dashboards`).
+Optional: `make demo` for a guided no-secrets loop (starts services and replays fixtures).
+
+Fixture note: `make alerts-check` without `ALERTS_WARN_ONLY` commonly exits non-zero because fixture timestamps look “stale” vs freshness thresholds — this is expected.

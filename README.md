@@ -4,6 +4,8 @@ This repository implements a **Kafka + Spark + PostGIS** pipeline that correlate
 
 **Phase 2** adds **ingestion run tracking** in Postgres, **risk model v2** with JSON explanations and spatial nearby-fire signal, **SQL views** for Grafana-friendly analytics, **`make quality-check`** / **`make replay-fixtures`**, and **optional Grafana** dashboards (Compose profile `grafana`).
 
+**Phase 3** adds **GeoJSON / centroid presentation views** for maps (`analytics.v_latest_smoke_risk_*_geojson`, point GeoJSON for fires/AQ), **Grafana geomap panels** (centroid markers; GeoJSON preview tables for polygons), **SLI views + `analytics.fn_alert_candidates`**, **`make alerts-check`** (thresholds via `ALERT_*` env vars), **multi-state census bootstrap** (`CENSUS_STATEFPS`, optional national counties), **materialized snapshots** + **`make refresh-mviews`**, and **`make demo`** as a **no-secrets** local walkthrough.
+
 **Important:** the risk score is a **demonstration / operations correlation index**, not a health advisory model.
 
 ## What this project does
@@ -12,7 +14,7 @@ This repository implements a **Kafka + Spark + PostGIS** pipeline that correlate
 - **Ingest** OpenAQ v3 measurements into Kafka (`openaq.measurements.raw`).
 - **Normalize** Kafka messages into PostGIS tables (`normalized.*`) using Spark batch jobs, including **spatial association** to `geo.counties` / `geo.tracts`.
 - **Compute** configurable-window risk scores into `analytics.smoke_risk_scores` (models **v1** and **v2**) and publish JSON snapshots to Kafka (`smoke.risk.scores`).
-- **Bootstrap** Tennessee county + tract boundaries from Census TIGER/Line (configurable year fallback).
+- **Bootstrap** county + tract boundaries from Census TIGER/Line (default **Tennessee**; optional **multi-state** or **national county** load via env — see below).
 
 ## Architecture
 
@@ -153,7 +155,42 @@ make grafana-up
 - UI: `http://localhost:3001` (override with `GRAFANA_PORT`; default **3001** avoids clashes with apps on `:3000`).
 - Login defaults: `GRAFANA_ADMIN_USER` / `GRAFANA_ADMIN_PASSWORD` (`admin` / `admin` unless overridden).
 - Postgres datasource and dashboard JSON are provisioned from `docker/grafana/provisioning/` and `docker/grafana/dashboards/smoke-risk.json`.
-- **Panels:** smoke risk by county (latest), smoke risk by tract (latest), top 20 risk geographies, latest fire detections, latest AQ measurements, ingestion run status, source freshness, data quality summary (table views; swap-in map panels later if desired).
+- **Maps (Phase 3):** county / tract **risk markers at centroids** (geomap), fire and AQ **point maps**, plus **GeoJSON preview** tables (truncated text). Canonical polygons remain in `geo.*`; dashboard views are documented as presentation-only.
+- **Tables:** top 20 risk areas, ingestion runs, source freshness, data quality summary.
+- **Limitation:** native GeoJSON polygon fills from Postgres in Grafana can be finicky in provisioned JSON; this dashboard favors **reliable marker maps + GeoJSON snippets** over brittle polygon layers.
+
+### Alerting / SLIs (SQL-first)
+
+- **Views:** `analytics.v_sli_*` surface ingestion failures, freshness ages, sparse recent rows, and high-risk rows.
+- **Candidates:** `analytics.fn_alert_candidates(warn_h, crit_h, risk_min, lookback_h)` unions actionable rows; `analytics.v_alert_candidates` uses defaults `(6, 24, 75, 24)`.
+- **CLI:** `make alerts-check` prints candidates and exits **2** if any **`severity = critical`** exists. Set **`ALERTS_WARN_ONLY=1`** to always exit 0 (recommended for fixture demos where timestamps are intentionally stale).
+- **Threshold env:** `ALERT_FRESHNESS_WARN_HOURS` (default 6), `ALERT_FRESHNESS_CRITICAL_HOURS` (24), `ALERT_HIGH_RISK_MIN_SCORE` (75), `ALERT_LOOKBACK_HOURS` (24).
+
+### Materialized views (optional performance)
+
+- **`analytics.mv_latest_smoke_risk_by_{county,tract}`** and **`analytics.mv_latest_smoke_risk_{county,tract}_geojson`** mirror the latest/geo views with **unique indexes** for `REFRESH MATERIALIZED VIEW CONCURRENTLY`.
+- Refresh after large loads: `make refresh-mviews` (runs `scripts/refresh_materialized_views.sh`).
+- Prefer plain **views** for simplicity locally; use **materialized** copies when map queries feel heavy.
+
+### Multi-state census bootstrap
+
+Defaults stay **Tennessee-only** to keep downloads small.
+
+| Env | Behavior |
+|-----|----------|
+| `CENSUS_STATEFP=47` | Single state (overrides yaml default when set). |
+| `CENSUS_STATEFPS=47,37,21` | Multiple states: **tract zip per state**; counties from **one national county file** filtered to those FIPS (unless national-full flag below). |
+| `CENSUS_LOAD_NATIONAL_COUNTIES=1` | Load **all US counties** (large); tracts still limited to selected states. Validation expects **≥ `min_counties_national_us`** (see `config/census.yaml`). |
+
+Row counts per state are printed after load (`GROUP BY statefp`). Scripts remain **idempotent** (truncate `geo.*` + reload staging).
+
+### One-command demo (no API keys)
+
+```bash
+make demo
+```
+
+Runs `up`, `db-bootstrap`, `topics`, `replay-fixtures`, `normalize`, `compute-risk`, `quality-check`, optional `refresh-mviews` (`DEMO_REFRESH_MVIEWS=0` to skip), then prints **Grafana / Console / Spark / psql** hints. Uses **`FIRMS_DRY_RUN` / `OPENAQ_DRY_RUN`** inside `replay-fixtures`; never requires live keys.
 
 ### Reset everything (destructive)
 
@@ -179,6 +216,9 @@ This wipes the Postgres volume, recreates topics, re-downloads Census data for t
 | `make replay-fixtures`| Fixture-only Kafka publish + normalize + risk      |
 | `make quality-check`  | DB / geometry / duplicate-ID structural checks   |
 | `make grafana-up`     | Start Grafana (`--profile grafana`)              |
+| `make refresh-mviews` | `REFRESH MATERIALIZED VIEW CONCURRENTLY` snapshots |
+| `make alerts-check`   | Print alert candidates; fail on **critical**    |
+| `make demo`           | No-secrets local demo (`replay-fixtures` path)   |
 | `make smoke-test`   | Run `scripts/smoke_test.sh`                      |
 | `make test`     | Run pytest                                           |
 
@@ -210,6 +250,8 @@ Stable analytics views for dashboards include:
 - `analytics.v_latest_fire_detections`, `analytics.v_latest_air_quality_measurements`
 - `analytics.v_ingestion_run_status`, `analytics.v_source_freshness`
 - `analytics.v_data_quality_summary`
+- **Phase 3 maps:** `analytics.v_latest_smoke_risk_county_geojson`, `analytics.v_latest_smoke_risk_tract_geojson`, `analytics.v_latest_fire_detections_geojson`, `analytics.v_latest_air_quality_geojson`
+- **Phase 3 SLIs / alerts:** `analytics.v_sli_*`, `analytics.v_alert_candidates`, `analytics.fn_alert_candidates(...)`
 
 Producer runs append rows to **`analytics.ingestion_runs`** (`run_id`, `source`, `mode` `live|dry_run`, counts, `config` JSON without secrets, `error_message` on failure).
 
@@ -266,6 +308,9 @@ Run **`SMOKE_RISK_MODEL_VERSION=v1`** to compare against v2 on the same window.
 
 ## Known limitations
 
+- **Grafana polygon provisioning**: centroid marker maps are the supported default; full GeoJSON polygon styling may require manual panel tuning beyond checked-in JSON.
+- **`make alerts-check` with fixtures**: checked-in FIRMS/OpenAQ timestamps are often outside freshness windows — expect **critical** staleness rows unless you widen thresholds or set **`ALERTS_WARN_ONLY=1`**.
+- **National counties**: `CENSUS_LOAD_NATIONAL_COUNTIES=1` downloads and loads **all** US counties — intentionally heavy; not the default.
 - **Coverage vs geography bootstrap**: FIRMS/OpenAQ defaults use a **continental U.S. bbox**, while census geometries default to **Tennessee** for manageable local downloads. Points outside the loaded state will not resolve `county_geoid` / `tract_geoid`.
 - **OpenAQ parameter IDs** can evolve; defaults are configured in `config/sources.yaml`.
 - **Spark jobs are batch** (`earliest` → `latest` offsets per run), not a continuously committed streaming deployment.
