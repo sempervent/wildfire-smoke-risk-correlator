@@ -235,7 +235,7 @@ def handle_normalize_failure(
     partition: int | None,
     offset_value: int | None,
     message_key: str | None,
-    envelope_for_sample: Any | None,
+    envelope_for_sample: Any | None = None,
 ) -> None:
     """Persist parse error + publish DLQ topics; never raises."""
 
@@ -244,10 +244,13 @@ def handle_normalize_failure(
         err_cls = classify_parse_exception(exc)
         msg = str(exc)
         sample_src: Any
-        try:
-            sample_src = json.loads(raw_bytes.decode("utf-8"))
-        except (UnicodeDecodeError, json.JSONDecodeError):
-            sample_src = {"_raw_preview": raw_bytes[:512].decode("utf-8", errors="replace")}
+        if envelope_for_sample is not None:
+            sample_src = envelope_for_sample
+        else:
+            try:
+                sample_src = json.loads(raw_bytes.decode("utf-8"))
+            except (UnicodeDecodeError, json.JSONDecodeError):
+                sample_src = {"_raw_preview": raw_bytes[:512].decode("utf-8", errors="replace")}
         sample = sanitize_payload_sample(sample_src)
 
         ctx = {
