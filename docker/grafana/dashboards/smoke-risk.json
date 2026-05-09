@@ -510,17 +510,112 @@
       ],
       "title": "Smoke risk v3 (latest rows)",
       "type": "table"
+    },
+    {
+      "datasource": {"type": "postgres", "uid": "smoke_pg"},
+      "fieldConfig": {"defaults": {}, "overrides": []},
+      "gridPos": {"h": 9, "w": 12, "x": 0, "y": 111},
+      "id": 305,
+      "options": {"showHeader": true},
+      "targets": [
+        {
+          "datasource": {"type": "postgres", "uid": "smoke_pg"},
+          "editorMode": "code",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "SELECT source_topic, target_dataset, error_class, occurrence_count, last_seen_at, error_message_preview AS error_preview, replay_hint FROM analytics.v_parse_errors_open LIMIT 80;",
+          "refId": "A"
+        }
+      ],
+      "title": "Open parse errors",
+      "type": "table"
+    },
+    {
+      "datasource": {"type": "postgres", "uid": "smoke_pg"},
+      "fieldConfig": {"defaults": {}, "overrides": []},
+      "gridPos": {"h": 9, "w": 12, "x": 12, "y": 111},
+      "id": 306,
+      "options": {"showHeader": true},
+      "targets": [
+        {
+          "datasource": {"type": "postgres", "uid": "smoke_pg"},
+          "editorMode": "code",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "SELECT * FROM analytics.v_parse_error_summary LIMIT 80;",
+          "refId": "A"
+        }
+      ],
+      "title": "Parse error summary",
+      "type": "table"
+    },
+    {
+      "datasource": {"type": "postgres", "uid": "smoke_pg"},
+      "fieldConfig": {"defaults": {}, "overrides": []},
+      "gridPos": {"h": 8, "w": 24, "x": 0, "y": 120},
+      "id": 307,
+      "options": {"showHeader": true},
+      "targets": [
+        {
+          "datasource": {"type": "postgres", "uid": "smoke_pg"},
+          "editorMode": "code",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "SELECT source_topic, target_dataset, error_class, occurrence_count, last_seen_at, LEFT(error_message::text, 160) AS error_preview FROM analytics.v_parse_errors_recent LIMIT 120;",
+          "refId": "A"
+        }
+      ],
+      "title": "Recent parse errors (24h)",
+      "type": "table"
+    },
+    {
+      "datasource": {"type": "postgres", "uid": "smoke_pg"},
+      "fieldConfig": {"defaults": {}, "overrides": []},
+      "gridPos": {"h": 8, "w": 12, "x": 0, "y": 128},
+      "id": 308,
+      "options": {"showHeader": true},
+      "targets": [
+        {
+          "datasource": {"type": "postgres", "uid": "smoke_pg"},
+          "editorMode": "code",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "SELECT consumer_group, topic, partition, current_offset, last_processed_at, age_hours, last_successful_offset, last_error_offset FROM analytics.v_consumer_offset_state ORDER BY topic, partition LIMIT 80;",
+          "refId": "A"
+        }
+      ],
+      "title": "Consumer offset state (Spark normalizers)",
+      "type": "table"
+    },
+    {
+      "datasource": {"type": "postgres", "uid": "smoke_pg"},
+      "fieldConfig": {"defaults": {}, "overrides": []},
+      "gridPos": {"h": 8, "w": 12, "x": 12, "y": 128},
+      "id": 309,
+      "options": {"showHeader": true},
+      "targets": [
+        {
+          "datasource": {"type": "postgres", "uid": "smoke_pg"},
+          "editorMode": "code",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "SELECT * FROM analytics.v_dlq_operational_summary;",
+          "refId": "A"
+        }
+      ],
+      "title": "DLQ operational summary",
+      "type": "table"
     }
   ],
   "refresh": "30s",
   "schemaVersion": 39,
-  "tags": ["smoke", "wildfire", "phase3", "phase5", "phase6"],
+  "tags": ["smoke", "wildfire", "phase3", "phase5", "phase6", "phase7"],
   "templating": {"list": []},
   "time": {"from": "now-7d", "to": "now"},
   "timepicker": {},
   "timezone": "browser",
-  "title": "Wildfire Smoke Risk (Phase 3–6 ops)",
+  "title": "Wildfire Smoke Risk (Phase 3–7 ops)",
   "uid": "wildfire-smoke-phase2",
-  "version": 3,
+  "version": 4,
   "weekStart": ""
 }
