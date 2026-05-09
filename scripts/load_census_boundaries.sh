@@ -26,7 +26,13 @@ COUNTY_MODE_FILE="${RAW_DIR}/.county_mode"
 
 YEAR="$(cat "${RESOLVED_YEAR_FILE}")"
 
-mapfile -t STATE_ARRAY < <(sed '/^$/d' "${STATES_FILE}" | tr -d '\r')
+STATE_ARRAY=()
+while IFS= read -r line || [[ -n "${line}" ]]; do
+  line="$(echo "${line}" | tr -d '\r')"
+  [[ -z "${line// }" ]] && continue
+  STATE_ARRAY+=("${line}")
+done < "${STATES_FILE}"
+
 if [[ "${#STATE_ARRAY[@]}" -lt 1 ]]; then
   echo "ERROR: No state FIPS entries in ${STATES_FILE}" >&2
   exit 1
