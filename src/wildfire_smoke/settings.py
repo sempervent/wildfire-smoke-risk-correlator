@@ -97,6 +97,17 @@ class Settings:
     dispersion_write_debug_fields: bool
     dispersion_allow_large_run: bool
 
+    calibration_min_aq_observations: int
+    calibration_high_pm25_threshold: float
+    calibration_low_pm25_threshold: float
+    calibration_high_dispersion_score: float
+    calibration_low_dispersion_score: float
+    calibration_lag_windows_hours: str
+
+    risk_eval_min_match_count: int
+    risk_eval_high_risk_threshold: float
+    risk_eval_high_obs_threshold: float
+
     @staticmethod
     def from_env() -> "Settings":
         load_dotenv(repo_root() / ".env", override=False)
@@ -258,6 +269,23 @@ class Settings:
         if dispersion_source_strength_mode not in {"frp", "brightness", "unit"}:
             raise ValueError("DISPERSION_SOURCE_STRENGTH_MODE must be one of: frp, brightness, unit")
 
+        calibration_min_aq_observations = int(os.environ.get("CALIBRATION_MIN_AQ_OBSERVATIONS", "3"))
+        if calibration_min_aq_observations < 1:
+            raise ValueError("CALIBRATION_MIN_AQ_OBSERVATIONS must be >= 1")
+        calibration_high_pm25_threshold = float(os.environ.get("CALIBRATION_HIGH_PM25_THRESHOLD", "35"))
+        calibration_low_pm25_threshold = float(os.environ.get("CALIBRATION_LOW_PM25_THRESHOLD", "12"))
+        calibration_high_dispersion_score = float(os.environ.get("CALIBRATION_HIGH_DISPERSION_SCORE", "70"))
+        calibration_low_dispersion_score = float(os.environ.get("CALIBRATION_LOW_DISPERSION_SCORE", "25"))
+        calibration_lag_windows_hours = os.environ.get(
+            "CALIBRATION_LAG_WINDOWS_HOURS", "0-3,3-6,6-12,12-24"
+        ).strip()
+
+        risk_eval_min_match_count = int(os.environ.get("RISK_EVAL_MIN_MATCH_COUNT", "3"))
+        if risk_eval_min_match_count < 1:
+            raise ValueError("RISK_EVAL_MIN_MATCH_COUNT must be >= 1")
+        risk_eval_high_risk_threshold = float(os.environ.get("RISK_EVAL_HIGH_RISK_THRESHOLD", "70"))
+        risk_eval_high_obs_threshold = float(os.environ.get("RISK_EVAL_HIGH_OBS_THRESHOLD", "35"))
+
         return Settings(
             kafka_bootstrap_servers=kafka_bootstrap_servers,
             postgres_host=postgres_host,
@@ -321,6 +349,15 @@ class Settings:
             dispersion_fallback_to_station_wind=dispersion_fallback_to_station_wind,
             dispersion_write_debug_fields=dispersion_write_debug_fields,
             dispersion_allow_large_run=dispersion_allow_large_run,
+            calibration_min_aq_observations=calibration_min_aq_observations,
+            calibration_high_pm25_threshold=calibration_high_pm25_threshold,
+            calibration_low_pm25_threshold=calibration_low_pm25_threshold,
+            calibration_high_dispersion_score=calibration_high_dispersion_score,
+            calibration_low_dispersion_score=calibration_low_dispersion_score,
+            calibration_lag_windows_hours=calibration_lag_windows_hours,
+            risk_eval_min_match_count=risk_eval_min_match_count,
+            risk_eval_high_risk_threshold=risk_eval_high_risk_threshold,
+            risk_eval_high_obs_threshold=risk_eval_high_obs_threshold,
         )
 
 

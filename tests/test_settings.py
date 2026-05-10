@@ -93,6 +93,17 @@ def test_dispersion_defaults(monkeypatch) -> None:
     assert s.dispersion_max_target_geographies >= 1
 
 
+def test_calibration_defaults(monkeypatch) -> None:
+    monkeypatch.delenv("CALIBRATION_MIN_AQ_OBSERVATIONS", raising=False)
+    monkeypatch.delenv("RISK_EVAL_MIN_MATCH_COUNT", raising=False)
+    s = Settings.from_env()
+    assert s.calibration_min_aq_observations == 3
+    assert s.calibration_high_pm25_threshold == 35.0
+    assert s.calibration_low_pm25_threshold == 12.0
+    assert "0-3" in s.calibration_lag_windows_hours
+    assert s.risk_eval_min_match_count == 3
+
+
 def test_settings_requires_key_for_live_firms(monkeypatch) -> None:
     monkeypatch.delenv("FIRMS_MAP_KEY", raising=False)
     monkeypatch.setenv("FIRMS_DRY_RUN", "0")
