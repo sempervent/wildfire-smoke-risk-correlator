@@ -26,6 +26,9 @@ def test_alert_threshold_defaults(monkeypatch) -> None:
     monkeypatch.delenv("ALERT_HIGH_DISPERSION_EXPOSURE_MIN_SCORE", raising=False)
     monkeypatch.delenv("ALERT_DISPERSION_NO_WIND_MATCHES_HOURS", raising=False)
     monkeypatch.delenv("ALERT_DISPERSION_AQ_MISMATCH_MIN_SCORE", raising=False)
+    monkeypatch.delenv("ALERT_MODEL_MISMATCH_MIN_COUNT", raising=False)
+    monkeypatch.delenv("ALERT_AQ_OBSERVATION_COVERAGE_MIN_COUNT", raising=False)
+    monkeypatch.delenv("ALERT_CALIBRATION_WARN_ONLY", raising=False)
 
     t = alert_thresholds_from_env()
     assert t.freshness_warn_hours == 6
@@ -42,6 +45,9 @@ def test_alert_threshold_defaults(monkeypatch) -> None:
     assert t.high_dispersion_exposure_min_score == 70.0
     assert t.dispersion_no_wind_matches_hours == 24
     assert t.dispersion_aq_mismatch_min_score == 50.0
+    assert t.model_mismatch_min_count == 3
+    assert t.aq_observation_coverage_min_count == 3
+    assert t.calibration_warn_only is True
 
 
 def test_alert_threshold_overrides(monkeypatch) -> None:

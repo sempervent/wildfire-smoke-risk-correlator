@@ -81,3 +81,15 @@ mappings:
   dispersion_aq_mismatch_high:
     slug: dispersion-aq-mismatch-high
     path: docs/runbooks/dispersion-aq-mismatch-high.md
+  model_overprediction_possible:
+    slug: model-overprediction-possible
+    path: docs/runbooks/model-overprediction-possible.md
+  model_underprediction_possible:
+    slug: model-underprediction-possible
+    path: docs/runbooks/model-underprediction-possible.md
+  calibration_insufficient_data:
+    slug: calibration-insufficient-data
+    path: docs/runbooks/calibration-insufficient-data.md
+  aq_observation_coverage_low:
+    slug: aq-observation-coverage-low
+    path: docs/runbooks/aq-observation-coverage-low.md

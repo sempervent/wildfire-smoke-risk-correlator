@@ -46,6 +46,9 @@ class AlertThresholds:
     high_dispersion_exposure_min_score: float
     dispersion_no_wind_matches_hours: int
     dispersion_aq_mismatch_min_score: float
+    model_mismatch_min_count: int
+    aq_observation_coverage_min_count: int
+    calibration_warn_only: bool
 
 
 def alert_thresholds_from_env() -> AlertThresholds:
@@ -80,4 +83,10 @@ def alert_thresholds_from_env() -> AlertThresholds:
         dispersion_aq_mismatch_min_score=_positive_float(
             os.environ.get("ALERT_DISPERSION_AQ_MISMATCH_MIN_SCORE"), 50.0
         ),
+        model_mismatch_min_count=_positive_int(os.environ.get("ALERT_MODEL_MISMATCH_MIN_COUNT"), 3),
+        aq_observation_coverage_min_count=_positive_int(
+            os.environ.get("ALERT_AQ_OBSERVATION_COVERAGE_MIN_COUNT"), 3
+        ),
+        calibration_warn_only=os.environ.get("ALERT_CALIBRATION_WARN_ONLY", "1").strip().lower()
+        in {"1", "true", "yes"},
     )

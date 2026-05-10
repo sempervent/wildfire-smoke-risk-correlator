@@ -21,6 +21,10 @@ def test_runbooks_yaml_maps_known_alert_types() -> None:
     assert "dispersion_no_wind_matches" in m
     assert "dispersion_no_targets" in m
     assert "dispersion_aq_mismatch_high" in m
+    assert "model_overprediction_possible" in m
+    assert "model_underprediction_possible" in m
+    assert "calibration_insufficient_data" in m
+    assert "aq_observation_coverage_low" in m
     slug = runbook_slug_for_alert_type("high_smoke_risk", m)
     assert slug == "high-smoke-risk"
 

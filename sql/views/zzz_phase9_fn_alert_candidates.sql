@@ -19,7 +19,10 @@ CREATE OR REPLACE FUNCTION analytics.fn_alert_candidates(
   p_fire_weather_unmatched_critical integer DEFAULT 25,
   p_high_dispersion_exposure_min double precision DEFAULT 70,
   p_dispersion_no_wind_hours integer DEFAULT 24,
-  p_dispersion_aq_mismatch_min double precision DEFAULT 50
+  p_dispersion_aq_mismatch_min double precision DEFAULT 50,
+  p_model_mismatch_min_count integer DEFAULT 3,
+  p_aq_obs_coverage_min integer DEFAULT 3,
+  p_calibration_warn_only integer DEFAULT 1
 )
 RETURNS TABLE (
   alert_type text,
@@ -810,6 +813,107 @@ AS $$
       AND c.computed_at >= (now() - interval '48 hours')
   ) mx
   WHERE mx.cnt >= 1
+
+  UNION ALL
+
+  SELECT
+    'model_overprediction_possible'::text,
+    CASE WHEN p_calibration_warn_only <> 0 THEN 'info'::text ELSE 'warn'::text END,
+    NULL::text,
+    NULL::text,
+    'Model vs AQ: possible overprediction (heuristic)'::text,
+    format('candidate_rows=%s (min %s)', oc.cnt, p_model_mismatch_min_count),
+    now(),
+    jsonb_build_object('candidate_rows', oc.cnt, 'threshold', p_model_mismatch_min_count)
+  FROM (
+    SELECT COUNT(*)::bigint AS cnt
+    FROM analytics.v_model_overprediction_candidates
+  ) oc
+  WHERE oc.cnt >= p_model_mismatch_min_count::bigint
+
+  UNION ALL
+
+  SELECT
+    'model_underprediction_possible'::text,
+    CASE WHEN p_calibration_warn_only <> 0 THEN 'info'::text ELSE 'warn'::text END,
+    NULL::text,
+    NULL::text,
+    'Model vs AQ: possible underprediction (heuristic)'::text,
+    format('candidate_rows=%s (min %s)', uc.cnt, p_model_mismatch_min_count),
+    now(),
+    jsonb_build_object('candidate_rows', uc.cnt, 'threshold', p_model_mismatch_min_count)
+  FROM (
+    SELECT COUNT(*)::bigint AS cnt
+    FROM analytics.v_model_underprediction_candidates
+  ) uc
+  WHERE uc.cnt >= p_model_mismatch_min_count::bigint
+
+  UNION ALL
+
+  SELECT
+    'calibration_insufficient_data'::text,
+    CASE WHEN p_calibration_warn_only <> 0 THEN 'info'::text ELSE 'warn'::text END,
+    NULL::text,
+    NULL::text,
+    'Calibration comparisons dominated by missing/thin AQ windows'::text,
+    format(
+      'thin_rows=%s total_rows=%s (>=70%% thin; min_total=%s)',
+      s.thin,
+      s.tot,
+      p_model_mismatch_min_count
+    ),
+    now(),
+    jsonb_build_object(
+      'thin_rows', s.thin,
+      'total_rows', s.tot,
+      'threshold_min_total', p_model_mismatch_min_count
+    )
+  FROM (
+    SELECT
+      COUNT(*)::bigint AS tot,
+      SUM(
+        CASE WHEN evidence_label IN ('no_aq_data', 'insufficient_aq_data') THEN 1 ELSE 0 END
+      )::bigint AS thin
+    FROM analytics.dispersion_aq_comparisons
+    WHERE computed_at >= (now() - INTERVAL '72 hours')
+  ) s
+  WHERE s.tot >= p_model_mismatch_min_count::bigint
+    AND s.tot > 0
+    AND (s.thin::double precision / s.tot::double precision) >= 0.7
+
+  UNION ALL
+
+  SELECT
+    'aq_observation_coverage_low'::text,
+    CASE WHEN p_calibration_warn_only <> 0 THEN 'info'::text ELSE 'warn'::text END,
+    NULL::text,
+    NULL::text,
+    'Distinct tract AQ coverage in last 24h below threshold'::text,
+    format(
+      'distinct_tract_aq_geographies=%s (min %s); fires_24h=%s',
+      aq.aq_geo,
+      p_aq_obs_coverage_min,
+      fc.fc
+    ),
+    now(),
+    jsonb_build_object(
+      'distinct_tract_aq_geographies', aq.aq_geo,
+      'threshold', p_aq_obs_coverage_min,
+      'fires_24h', fc.fc
+    )
+  FROM (
+    SELECT COUNT(DISTINCT tract_geoid)::bigint AS aq_geo
+    FROM normalized.air_quality_measurements
+    WHERE measured_at >= (now() - INTERVAL '24 hours')
+      AND tract_geoid IS NOT NULL
+  ) aq,
+  (
+    SELECT COUNT(*)::bigint AS fc
+    FROM normalized.fire_detections
+    WHERE acq_datetime >= (now() - INTERVAL '24 hours')
+  ) fc
+  WHERE fc.fc > 0
+    AND aq.aq_geo < p_aq_obs_coverage_min::bigint
 $$;
 
 CREATE OR REPLACE VIEW analytics.v_alert_candidates AS
@@ -834,8 +938,11 @@ FROM analytics.fn_alert_candidates(
   25,
   70::double precision,
   24,
-  50::double precision
+  50::double precision,
+  3,
+  3,
+  1
 );
 
 COMMENT ON VIEW analytics.v_alert_candidates IS
-  'Default-parameter alert union (Phase 10 integration SLIs); override thresholds via analytics.fn_alert_candidates(...) or scripts/check_alerts.sh.';
+  'Default-parameter alert union (integration + calibration SLIs); override thresholds via analytics.fn_alert_candidates(...) or scripts/check_alerts.sh.';

@@ -66,6 +66,10 @@ def stable_fingerprint_details(alert_type: str, details: dict[str, Any]) -> dict
         "dispersion_no_wind_matches",
         "dispersion_no_targets",
         "dispersion_aq_mismatch_high",
+        "model_overprediction_possible",
+        "model_underprediction_possible",
+        "calibration_insufficient_data",
+        "aq_observation_coverage_low",
     }:
         return {}
     return {}
@@ -105,6 +109,10 @@ def fingerprint_for_candidate(
             "dispersion_no_wind_matches",
             "dispersion_no_targets",
             "dispersion_aq_mismatch_high",
+            "model_overprediction_possible",
+            "model_underprediction_possible",
+            "calibration_insufficient_data",
+            "aq_observation_coverage_low",
         }
         else title
     )
@@ -130,7 +138,8 @@ def fetch_candidates(conn: psycopg.Connection) -> list[tuple[Any, ...]]:
               %s, %s, %s::double precision, %s, %s::double precision, %s, %s, %s,
               %s, %s, %s::bigint, %s::bigint, %s::bigint, %s::bigint,
               %s, %s, %s,
-              %s::double precision, %s, %s::double precision
+              %s::double precision, %s, %s::double precision,
+              %s, %s, %s
             )
             """,
             (
@@ -154,6 +163,9 @@ def fetch_candidates(conn: psycopg.Connection) -> list[tuple[Any, ...]]:
                 thr.high_dispersion_exposure_min_score,
                 thr.dispersion_no_wind_matches_hours,
                 thr.dispersion_aq_mismatch_min_score,
+                thr.model_mismatch_min_count,
+                thr.aq_observation_coverage_min_count,
+                1 if thr.calibration_warn_only else 0,
             ),
         )
         return list(cur.fetchall())
