@@ -16,6 +16,7 @@ All notable changes to this project are documented here. Releases are **engineer
 - **README.md** rewritten as a concise project front door; detailed material moved into MkDocs pages.
 - **Package version → 1.1.0**.
 - **Product language in docs, scripts, and tests:** user-facing text and test names use **feature areas** (DLQ, gridded weather, calibration, etc.) instead of internal “Phase N” labels. **On-disk SQL migration and view filenames are unchanged** for compatibility.
+- **MkDocs presentation:** task-oriented navigation (Getting started / Operations / Models / Development), **`docs/stylesheets/extra.css`**, teal Material palette, expanded navigation and pymdown extensions, **Mermaid** retained via **superfences**; GitHub Pages workflow runs **`actions/configure-pages`** before upload.
 
 ### Notes
 

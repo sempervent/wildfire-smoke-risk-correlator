@@ -3,30 +3,40 @@
 This project is a **bounded vertical slice** that joins wildfire hotspot detections, air-quality observations, and optional meteorology into **PostGIS** census units, then publishes **engineering smoke-risk indices** and diagnostic SQL views.
 
 ```mermaid
-flowchart TB
-  subgraph ingest["Ingest"]
-    FIRMS[FIRMS producer]
-    OAQ[OpenAQ producer]
-    WIND[Wind / grid weather]
+flowchart LR
+  subgraph src["Sources"]
+    F[FIRMS]
+    A[OpenAQ]
+    N[NWS / wind / grid]
+    C[Census]
   end
-  subgraph kafka["Kafka"]
-    RK[Raw topics]
+  subgraph bus["Kafka / Redpanda"]
+    R[Raw topics]
   end
-  subgraph spark["Spark batch"]
-    NORM[normalize_* jobs]
+  subgraph spark["Spark"]
+    Z[Normalize]
   end
   subgraph pg["PostGIS"]
-    GEO[geo.counties / tracts]
-    NORMT[normalized.*]
+    GEO[geo.*]
+    NZ[normalized.*]
     AN[analytics.*]
   end
-  FIRMS --> RK
-  OAQ --> RK
-  WIND --> RK
-  RK --> NORM
-  NORM --> NORMT
-  GEO --> NORM
-  NORMT --> AN
+  subgraph out["Operators"]
+    G[Grafana]
+    AL[Alerts]
+    X[Calibration exports]
+  end
+  F --> R
+  A --> R
+  N --> R
+  C --> GEO
+  R --> Z
+  GEO --> Z
+  Z --> NZ
+  NZ --> AN
+  AN --> G
+  AN --> AL
+  AN --> X
 ```
 
 ## Major components

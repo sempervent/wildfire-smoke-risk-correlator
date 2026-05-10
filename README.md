@@ -4,7 +4,7 @@
 
 > **Warning — non-claims:** This project is **not** a public-health advisory system, **not** regulatory dispersion or compliance air-quality modeling, and **not** operational emergency guidance. It is an **engineering / research platform** using **open data** and inspectable SQL — for local reproducible experimentation, not clinical or regulatory claims.
 
-**Full documentation (MkDocs):** [Documentation site](https://sempervent.github.io/wildfire-smoke-risk-correlator/) — available after [enabling GitHub Pages](docs/release/v1.1.0.md#enable-github-pages-manual-once-per-repo) (GitHub Actions source). Browse sources under [`docs/`](docs/index.md).
+**Full documentation (MkDocs + Material):** [Documentation site](https://sempervent.github.io/wildfire-smoke-risk-correlator/) — available after [enabling GitHub Pages](docs/release/v1.1.0.md#enable-github-pages-manual-once-per-repo) (GitHub Actions source). Browse sources under [`docs/`](docs/index.md). Locally: **`make docs-serve`** (theme + custom stylesheet under **`docs/stylesheets/`**).
 
 ---
 

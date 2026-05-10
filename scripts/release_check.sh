@@ -77,6 +77,7 @@ test -f "${ROOT_DIR}/.github/workflows/docs.yml"
 
 echo "==> release_check: MkDocs configuration"
 test -f "${ROOT_DIR}/mkdocs.yml"
+test -f "${ROOT_DIR}/docs/stylesheets/extra.css"
 
 echo "==> release_check: MkDocs strict build (requires uv sync --extra docs)"
 make docs-check

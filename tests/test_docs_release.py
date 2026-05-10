@@ -24,15 +24,28 @@ def test_mkdocs_and_site_layout_exists() -> None:
         "operations/db-doctor.md",
         "reference/make-targets.md",
         "release/v1.1.0.md",
+        "development/ci.md",
+        "models/plume-dispersion.md",
+        "stylesheets/extra.css",
     ):
         assert needle in text
+    assert "site_url: https://" in text and "github.io" in text
+    assert "pymdownx.superfences" in text
+    assert "name: mermaid" in text
+    assert "mermaid.min.js" in text
+    assert "pymdownx.highlight" in text
+    # Task-oriented nav must not use phase rollout labels
+    assert "Phase " not in text
 
 
 def test_nav_pages_exist_on_disk() -> None:
     root = repo_root()
     expected = [
         "docs/index.md",
+        "docs/stylesheets/extra.css",
         "docs/getting-started.md",
+        "docs/development/ci.md",
+        "docs/models/plume-dispersion.md",
         "docs/architecture/overview.md",
         "docs/architecture/dataflow.md",
         "docs/architecture/data-model.md",
@@ -55,6 +68,7 @@ def test_nav_pages_exist_on_disk() -> None:
         "docs/reference/risk-models.md",
         "docs/reference/limitations.md",
         "docs/release/v1.1.0.md",
+        "docs/release/v1.0.0-checklist.md",
     ]
     for rel in expected:
         assert (root / rel).is_file(), rel
@@ -64,7 +78,11 @@ def test_docs_workflow_exists() -> None:
     p = repo_root() / ".github/workflows/docs.yml"
     assert p.is_file()
     txt = p.read_text(encoding="utf-8")
-    assert "mkdocs" in txt.lower() or "docs-check" in txt
+    assert "docs-check" in txt or "mkdocs" in txt.lower()
+    assert "pages: write" in txt
+    assert "id-token: write" in txt
+    assert "workflow_dispatch" in txt
+    assert "actions/deploy-pages" in txt or "deploy-pages@" in txt
 
 
 def test_makefile_has_docs_targets() -> None:
@@ -76,6 +94,7 @@ def test_makefile_has_docs_targets() -> None:
 def test_release_check_invokes_docs_check() -> None:
     txt = (repo_root() / "scripts/release_check.sh").read_text(encoding="utf-8")
     assert "make docs-check" in txt
+    assert "docs/stylesheets/extra.css" in txt
 
 
 def test_changelog_has_v1_1_0() -> None:

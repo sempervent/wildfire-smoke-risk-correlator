@@ -7,38 +7,57 @@ repo_url: https://github.com/sempervent/wildfire-smoke-risk-correlator
 repo_name: wildfire-smoke-risk-correlator
 edit_uri: edit/main/docs/
 
-# Omit legacy / checklist pages and operator runbooks from the published nav (sources remain in-repo).
+# Omit legacy pointer pages and old milestone stubs from the build (sources remain in-repo).
 exclude_docs: |
   architecture/system-overview.md
   release/v0.1.0.md
-  release/v1.0.0-checklist.md
   runbooks/*.md
+
+copyright: Copyright &copy; contributors — engineering documentation; not health advice.
 
 theme:
   name: material
   palette:
     - scheme: default
-      primary: indigo
+      primary: teal
+      accent: deep orange
       toggle:
         icon: material/brightness-7
         name: Switch to dark mode
     - scheme: slate
-      primary: indigo
+      primary: teal
+      accent: amber
       toggle:
         icon: material/brightness-4
         name: Switch to light mode
   features:
-    - navigation.tabs
+    - navigation.instant
+    - navigation.tracking
     - navigation.sections
-    - content.code.copy
+    - navigation.expand
+    - navigation.indexes
+    - navigation.top
+    - toc.follow
     - search.suggest
+    - search.highlight
+    - content.code.copy
+    - content.code.annotate
+    - content.tabs.link
+
+extra_css:
+  - stylesheets/extra.css
 
 plugins:
   - search
 
 markdown_extensions:
   - admonition
+  - attr_list
+  - md_in_html
   - pymdownx.details
+  - pymdownx.highlight
+  - pymdownx.inlinehilite
+  - pymdownx.snippets
   - pymdownx.superfences:
       custom_fences:
         - name: mermaid
@@ -55,33 +74,39 @@ extra_javascript:
 
 nav:
   - Home: index.md
-  - Getting started: getting-started.md
+  - Getting started:
+      - Quickstart: getting-started.md
+      - Configuration: reference/environment.md
+      - No-secrets demo: user-guide/no-secrets-demo.md
+      - Live ingest: user-guide/live-ingest.md
   - Architecture:
-      - Overview: architecture/overview.md
+      - System overview: architecture/overview.md
       - Data flow: architecture/dataflow.md
       - Data model: architecture/data-model.md
       - Operational model: architecture/operational-model.md
-  - User guide:
-      - No-secrets demo: user-guide/no-secrets-demo.md
-      - Live ingest: user-guide/live-ingest.md
-      - Dashboards: user-guide/dashboards.md
-      - Calibration and evaluation: user-guide/calibration.md
-      - Alerting and notifications: user-guide/alerting.md
-      - DLQ and replay: user-guide/dlq-and-replay.md
-      - Exports: user-guide/exports.md
   - Operations:
       - Database bootstrap: operations/db-bootstrap.md
       - Database doctor: operations/db-doctor.md
+      - Kafka and DLQ: user-guide/dlq-and-replay.md
+      - Alerting: user-guide/alerting.md
+      - Dashboards: user-guide/dashboards.md
+      - Calibration exports: user-guide/exports.md
       - Release check: operations/release-check.md
-      - Troubleshooting: operations/troubleshooting.md
+  - Models:
+      - Risk models: reference/risk-models.md
+      - Plume and dispersion: models/plume-dispersion.md
+      - Calibration and evaluation: user-guide/calibration.md
   - Reference:
       - Make targets: reference/make-targets.md
-      - Environment: reference/environment.md
+      - Environment variables: reference/environment.md
       - Data sources: reference/data-sources.md
       - Tables and views: reference/tables-and-views.md
-      - Risk models: reference/risk-models.md
       - Limitations: reference/limitations.md
-  - Release notes:
+  - Release:
       - v1.1.0: release/v1.1.0.md
       - v1.0.1: release/v1.0.1.md
       - v1.0.0: release/v1.0.0.md
+  - Development:
+      - CI and testing: development/ci.md
+      - Release checklist: release/v1.0.0-checklist.md
+      - Troubleshooting: operations/troubleshooting.md

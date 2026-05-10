@@ -31,30 +31,36 @@
 **`make export-calibration`** writes timestamped CSV bundles (optional Parquet) under **`artifacts/calibration/<UTC-stamp>/`** with redacted metadata — offline review snapshots, not regulatory submissions.
 
 ```mermaid
-flowchart LR
+flowchart TB
   subgraph sources["Sources"]
     F[FIRMS]
     A[OpenAQ]
-    W[Wind / NWS]
-    C[Census TIGER]
+    W[NWS / wind / grid]
+    C[Census boundaries]
   end
-  subgraph pipe["Pipeline"]
-    K[Kafka raw]
-    S[Spark normalize]
-    P[(PostGIS)]
+  subgraph buf["Kafka / Redpanda"]
+    K[Raw + DLQ topics]
   end
-  subgraph out["Outputs"]
-    R[Risk scores]
+  subgraph pipe["Spark normalization"]
+    S[Batch jobs]
+  end
+  subgraph pg["PostGIS analytics"]
+    P[(Normalized + risk + calibration)]
+  end
+  subgraph observe["Inspection"]
+    R[Risk / maps / SQL views]
     G[Grafana]
-    AL[Alerts]
+    AL[Alerts + runbooks]
+    E[Calibration CSV / Parquet exports]
   end
   F --> K
   A --> K
   W --> K
-  C --> P
   K --> S
+  C --> P
   S --> P
   P --> R
-  P --> G
-  P --> AL
+  R --> G
+  R --> AL
+  P --> E
 ```
