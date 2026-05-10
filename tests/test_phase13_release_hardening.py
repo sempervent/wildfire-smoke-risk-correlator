@@ -123,5 +123,5 @@ def test_minimal_census_geojson_fixtures_parse() -> None:
 
 def test_package_version_exported() -> None:
     assert isinstance(__version__, str)
-    assert __version__.startswith("1.0.")
-    assert __version__ >= "1.0.1"
+    assert __version__.startswith("1.1.")
+    assert __version__ >= "1.1.0"

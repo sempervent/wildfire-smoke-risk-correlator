@@ -11,8 +11,8 @@ from wildfire_smoke.release_manifest import build_manifest, redact_env_snapshot
 from wildfire_smoke.settings import repo_root
 
 
-def test_version_is_1_0_1() -> None:
-    assert __version__ == "1.0.1"
+def test_version_is_1_1_0() -> None:
+    assert __version__ == "1.1.0"
 
 
 def test_migration_013_drops_fn_overloads_then_defines_canonical() -> None:
@@ -45,6 +45,7 @@ def test_release_docs_and_checklist_exist() -> None:
     root = repo_root()
     assert (root / "docs/release/v1.0.0.md").is_file()
     assert (root / "docs/release/v1.0.1.md").is_file()
+    assert (root / "docs/release/v1.1.0.md").is_file()
     assert (root / "docs/release/v1.0.0-checklist.md").is_file()
 
 
@@ -52,6 +53,7 @@ def test_changelog_documents_v1_releases() -> None:
     cl = (repo_root() / "CHANGELOG.md").read_text(encoding="utf-8")
     assert "[1.0.0]" in cl
     assert "[1.0.1]" in cl
+    assert "[1.1.0]" in cl
 
 
 def test_pyproject_declares_parquet_extra() -> None:
@@ -71,7 +73,7 @@ def test_release_manifest_redacts_sensitive_env(monkeypatch: pytest.MonkeyPatch)
 
 def test_release_manifest_build_has_non_claims() -> None:
     m = build_manifest()
-    assert m["version"] == "1.0.1"
+    assert m["version"] == "1.1.0"
     assert "known_non_claims" in m
     assert any("public health" in x.lower() for x in m["known_non_claims"])
 

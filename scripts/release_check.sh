@@ -29,15 +29,17 @@ make version
 echo "==> release_check: release docs + changelog"
 test -f "${ROOT_DIR}/docs/release/v1.0.0.md"
 test -f "${ROOT_DIR}/docs/release/v1.0.1.md"
+test -f "${ROOT_DIR}/docs/release/v1.1.0.md"
 test -f "${ROOT_DIR}/CHANGELOG.md"
 grep -qiE '(v1\.0\.0|\[1\.0\.0\])' "${ROOT_DIR}/CHANGELOG.md"
 grep -qiE '(v1\.0\.1|\[1\.0\.1\])' "${ROOT_DIR}/CHANGELOG.md"
+grep -qiE '(v1\.1\.0|\[1\.1\.0\])' "${ROOT_DIR}/CHANGELOG.md"
 
-echo "==> release_check: AGENTS.md Phase 14 release / drift invariants"
-grep -qi "Phase 14" "${ROOT_DIR}/AGENTS.md"
+echo "==> release_check: AGENTS.md documentation + drift invariants"
+grep -qi "MkDocs" "${ROOT_DIR}/AGENTS.md"
 grep -qi "fn_alert_candidates" "${ROOT_DIR}/AGENTS.md"
 
-echo "==> release_check: .env.example Phase 14 knobs"
+echo "==> release_check: .env.example calibration / integration knobs"
 for sym in \
   CALIBRATION_MIN_AQ_OBSERVATIONS \
   LOAD_RISK_OBSERVATION_FIXTURES \
@@ -71,6 +73,13 @@ bash -n "${ROOT_DIR}/scripts/write_release_manifest.sh"
 echo "==> release_check: CI workflow YAML files"
 test -f "${ROOT_DIR}/.github/workflows/ci.yml"
 test -f "${ROOT_DIR}/.github/workflows/integration.yml"
+test -f "${ROOT_DIR}/.github/workflows/docs.yml"
+
+echo "==> release_check: MkDocs configuration"
+test -f "${ROOT_DIR}/mkdocs.yml"
+
+echo "==> release_check: MkDocs strict build (requires uv sync --extra docs)"
+make docs-check
 
 echo "==> release_check: runbook markdown paths"
 uv run python -c "

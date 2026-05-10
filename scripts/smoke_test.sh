@@ -17,10 +17,12 @@ if [[ "${SMOKE_NO_COMPOSE:-0}" == "1" ]]; then
   echo "==> Grafana dashboard JSON"
   python3 -m json.tool "${ROOT_DIR}/docker/grafana/dashboards/smoke-risk.json" >/dev/null
 
-  echo "==> Phase 13/14 release / CI artifacts present"
+  echo "==> Release / CI / docs artifacts present"
   test -f "${ROOT_DIR}/docs/release/v1.0.0.md"
   test -f "${ROOT_DIR}/docs/release/v1.0.1.md"
+  test -f "${ROOT_DIR}/docs/release/v1.1.0.md"
   test -f "${ROOT_DIR}/docs/release/v1.0.0-checklist.md"
+  test -f "${ROOT_DIR}/mkdocs.yml"
   test -f "${ROOT_DIR}/CHANGELOG.md"
   test -f "${ROOT_DIR}/docs/architecture/system-overview.md"
   test -f "${ROOT_DIR}/docs/architecture/dataflow.md"
