@@ -4,6 +4,42 @@ set -euo pipefail
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "${ROOT_DIR}"
 
+if [[ "${SMOKE_NO_COMPOSE:-0}" == "1" ]]; then
+  echo "==> SMOKE_NO_COMPOSE=1: fast host checks (no Docker Compose / Postgres required)"
+
+  echo "==> bash syntax (scripts/*.sh)"
+  shopt -s nullglob
+  for f in "${ROOT_DIR}/scripts/"*.sh; do
+    bash -n "$f"
+  done
+  shopt -u nullglob
+
+  echo "==> Grafana dashboard JSON"
+  python3 -m json.tool "${ROOT_DIR}/docker/grafana/dashboards/smoke-risk.json" >/dev/null
+
+  echo "==> Phase 13 release / CI artifacts present"
+  test -f "${ROOT_DIR}/docs/release/v0.1.0.md"
+  test -f "${ROOT_DIR}/CHANGELOG.md"
+  test -f "${ROOT_DIR}/docs/architecture/system-overview.md"
+  test -f "${ROOT_DIR}/docs/architecture/dataflow.md"
+  test -f "${ROOT_DIR}/docs/architecture/operational-model.md"
+  test -f "${ROOT_DIR}/.github/workflows/ci.yml"
+  test -f "${ROOT_DIR}/.github/workflows/integration.yml"
+
+  echo "==> calibration export dry-run (no DB writes to analytics views)"
+  if command -v uv >/dev/null 2>&1; then
+    uv sync --extra dev >/dev/null
+    CALIBRATION_EXPORT_DRY_RUN=1 uv run python -m wildfire_smoke.export_calibration
+    echo "==> make version"
+    make -C "${ROOT_DIR}" version
+  else
+    echo "WARN: uv not installed; skipping export dry-run + version smoke." >&2
+  fi
+
+  echo "Smoke test (no-compose) passed."
+  exit 0
+fi
+
 COMPOSE="${COMPOSE:-docker compose}"
 POSTGRES_USER="${POSTGRES_USER:-smoke}"
 POSTGRES_DB="${POSTGRES_DB:-smoke}"

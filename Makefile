@@ -1,6 +1,6 @@
 COMPOSE ?= docker compose
 
-.PHONY: up down reset db-bootstrap topics ingest-once ingest-live-once normalize normalize-wind normalize-grid-weather match-fire-weather compute-plume compute-dispersion compare-dispersion-aq dispersion-demo load-risk-observation-fixtures calibration-summary calibration-demo smoke-transport-demo smoke-test dlq-smoke-test grid-weather-demo grid-weather-smoke-test integration-regression integration-smoke-test assert-integration-state evaluate-risk test deps quality-check replay-fixtures replay-grid-weather-fixtures replay-wind-fixtures replay-bad-fixtures replay-dlq parse-errors parse-errors-compact consumer-offsets collect-lag kafka-lag grafana-up refresh-mviews alerts-check alerts-materialize alerts-send alerts-send-digest alerts-send-retry operational-cycle operational-scheduler-up demo
+.PHONY: up down reset db-bootstrap db-bootstrap-minimal topics ingest-once ingest-live-once normalize normalize-wind normalize-grid-weather match-fire-weather compute-plume compute-dispersion compare-dispersion-aq dispersion-demo load-risk-observation-fixtures calibration-summary calibration-demo smoke-transport-demo smoke-test dlq-smoke-test grid-weather-demo grid-weather-smoke-test integration-regression integration-smoke-test assert-integration-state evaluate-risk test deps quality-check replay-fixtures replay-grid-weather-fixtures replay-wind-fixtures replay-bad-fixtures replay-dlq parse-errors parse-errors-compact consumer-offsets collect-lag kafka-lag grafana-up refresh-mviews alerts-check alerts-materialize alerts-send alerts-send-digest alerts-send-retry operational-cycle operational-scheduler-up demo export-calibration export-calibration-csv export-calibration-parquet release-check version
 
 deps:
 	uv sync --extra dev
@@ -17,6 +17,10 @@ reset:
 db-bootstrap:
 	bash scripts/download_census_boundaries.sh
 	bash scripts/load_census_boundaries.sh
+	bash scripts/bootstrap_db.sh
+
+db-bootstrap-minimal:
+	bash scripts/load_minimal_census_fixtures.sh
 	bash scripts/bootstrap_db.sh
 
 topics:
@@ -152,6 +156,28 @@ demo:
 
 smoke-test:
 	bash scripts/smoke_test.sh
+
+export-calibration:
+	bash scripts/export_calibration.sh
+
+export-calibration-csv:
+	CALIBRATION_EXPORT_INCLUDE_PARQUET=0 bash scripts/export_calibration.sh
+
+export-calibration-parquet:
+	CALIBRATION_EXPORT_INCLUDE_PARQUET=1 bash scripts/export_calibration.sh
+
+release-check:
+	bash scripts/release_check.sh
+
+version:
+	@uv run python -c 'from wildfire_smoke import __version__ as v; print("package_version", v)'
+	@if git rev-parse --is-inside-work-tree >/dev/null 2>&1; then \
+		echo "git_commit $$(git rev-parse HEAD)"; \
+		echo "git_branch $$(git rev-parse --abbrev-ref HEAD)"; \
+		if [[ -n $$(git status --porcelain 2>/dev/null) ]]; then echo "working_tree dirty"; else echo "working_tree clean"; fi; \
+	else \
+		echo "git unavailable"; \
+	fi
 
 test:
 	uv run pytest -q

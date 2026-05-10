@@ -15,6 +15,7 @@ build/
 *.pem
 
 # Data artifacts
+artifacts/
 data/raw/census/
 data/raw/fixtures/
 *.zip
