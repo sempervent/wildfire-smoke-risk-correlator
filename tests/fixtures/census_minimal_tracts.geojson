@@ -1,0 +1,79 @@
+{
+  "type": "FeatureCollection",
+  "name": "census_minimal_tracts_ci_fixture",
+  "note": "Synthetic tract boxes aligned with sample risk_observations geoids — CI only.",
+  "features": [
+    {
+      "type": "Feature",
+      "properties": {
+        "geoid": "47037015609",
+        "statefp": "47",
+        "countyfp": "037",
+        "tractce": "015609",
+        "name": "Tract 015609 (minimal CI fixture)",
+        "aland": 100000,
+        "awater": 0
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [-86.85, 36.14],
+            [-86.80, 36.14],
+            [-86.80, 36.18],
+            [-86.85, 36.18],
+            [-86.85, 36.14]
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "geoid": "47037015622",
+        "statefp": "47",
+        "countyfp": "037",
+        "tractce": "015622",
+        "name": "Tract 015622 (minimal CI fixture)",
+        "aland": 100000,
+        "awater": 0
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [-86.80, 36.14],
+            [-86.75, 36.14],
+            [-86.75, 36.18],
+            [-86.80, 36.18],
+            [-86.80, 36.14]
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "geoid": "47189030310",
+        "statefp": "47",
+        "countyfp": "189",
+        "tractce": "030310",
+        "name": "Tract 030310 (minimal CI fixture)",
+        "aland": 100000,
+        "awater": 0
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [-86.62, 36.14],
+            [-86.57, 36.14],
+            [-86.57, 36.18],
+            [-86.62, 36.18],
+            [-86.62, 36.14]
+          ]
+        ]
+      }
+    }
+  ]
+}
