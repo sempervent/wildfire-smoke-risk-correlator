@@ -1,0 +1,108 @@
+# Bounded Compose integration — manual / scheduled / label-gated. No live API keys.
+#
+# Self-hosted runners (optional): heavier Compose + Spark may exceed GitHub-hosted limits or
+# queue time. Register a repo/org self-hosted runner, then change `runs-on` below to e.g.
+#   runs-on: [self-hosted, linux]
+# See: https://docs.github.com/en/actions/hosting-your-own-runners/managing-self-hosted-runners/about-self-hosted-runners
+#
+# Scheduled runs (weekly cron) additionally execute `scripts/release_check.sh` with
+# COMPOSE_INTEGRATION=1 and upload optional calibration export artifacts (CSV/metadata).
+name: Integration
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "0 6 * * 1"
+  pull_request:
+    types: [labeled]
+
+jobs:
+  compose-integration:
+    if: |
+      github.event_name == 'workflow_dispatch' ||
+      github.event_name == 'schedule' ||
+      (github.event_name == 'pull_request' && contains(github.event.pull_request.labels.*.name, 'integration'))
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    env:
+      FIXTURE_TIME_MODE: relative
+      USE_ALIGNED_FIXTURES: "1"
+      LOAD_RISK_OBSERVATION_FIXTURES: "1"
+      DISPERSION_ENABLED: "1"
+      GRID_WEATHER_ENABLED: "1"
+      ALERTS_WARN_ONLY: "1"
+      FIRMS_DRY_RUN: "1"
+      OPENAQ_DRY_RUN: "1"
+      WIND_DRY_RUN: "1"
+      GRID_WEATHER_DRY_RUN: "1"
+      MINIMAL_CENSUS_REPLACE_ALL: "1"
+      COMPOSE_INTEGRATION: "1"
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v5
+        with:
+          version: "latest"
+
+      - name: Sync dependencies
+        run: uv sync --extra dev
+
+      - name: Start stack (Postgres + Redpanda + Spark)
+        run: docker compose up -d postgres redpanda redpanda-console spark-master spark-worker
+
+      - name: Wait for Postgres
+        run: |
+          for i in $(seq 1 60); do
+            docker compose exec -T postgres pg_isready -U smoke -d smoke && exit 0
+            sleep 2
+          done
+          exit 1
+
+      - name: Minimal census + migrations/views
+        run: make db-bootstrap-minimal
+
+      - name: Kafka topics
+        run: make topics
+
+      - name: Integration smoke test
+        run: make integration-smoke-test
+
+      # Scheduled / manual: full release-check with Compose gates (pytest, db-doctor, export dry-run).
+      - name: Release check (COMPOSE_INTEGRATION=1)
+        if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
+        env:
+          COMPOSE_INTEGRATION: "1"
+        run: bash scripts/release_check.sh
+
+      # Optional snapshot for offline review — CSV + metadata under CALIBRATION_EXPORT_DIR.
+      - name: Calibration export (artifact)
+        if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
+        continue-on-error: true
+        env:
+          CALIBRATION_EXPORT_DIR: ${{ github.workspace }}/artifacts/calibration-ci
+        run: |
+          mkdir -p artifacts/calibration-ci
+          make export-calibration || echo "::warning::export-calibration failed — uploading partial artifacts if any"
+
+      - name: Upload calibration export artifact
+        if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
+        uses: actions/upload-artifact@v4
+        continue-on-error: true
+        with:
+          name: calibration-export-${{ github.run_id }}-${{ github.run_attempt }}
+          path: artifacts/calibration-ci/
+          retention-days: 14
+          if-no-files-found: warn
+
+      # Full regression is Spark-heavy; enable explicitly on dispatch via repo variable later if desired.
+      - name: Integration regression (optional flag file)
+        if: github.event_name == 'workflow_dispatch'
+        continue-on-error: true
+        run: |
+          if [[ -f .github/integration-run-regression ]]; then
+            make integration-regression
+          else
+            echo "Skipping integration-regression (create .github/integration-run-regression to force on workflow_dispatch)."
+          fi

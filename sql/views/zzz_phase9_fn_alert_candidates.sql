@@ -1,0 +1,5 @@
+-- Canonical analytics.fn_alert_candidates and analytics.v_alert_candidates are defined in
+-- sql/migrations/013_phase14_canonical_alert_function.sql (applied after dependent views).
+--
+-- This file intentionally contains no DDL so bootstrap order can install Phase 10–12 views
+-- before the alert function body references them.

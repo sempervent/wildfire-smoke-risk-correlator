@@ -1,0 +1,2366 @@
+{
+  "annotations": {
+    "list": []
+  },
+  "editable": true,
+  "fiscalYearStartMonth": 0,
+  "graphTooltip": 0,
+  "links": [],
+  "liveNow": false,
+  "panels": [
+    {
+      "datasource": {
+        "type": "postgres",
+        "uid": "smoke_pg"
+      },
+      "fieldConfig": {
+        "defaults": {},
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 5,
+        "w": 24,
+        "x": 0,
+        "y": 0
+      },
+      "id": 500,
+      "options": {
+        "showHeader": true
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "postgres",
+            "uid": "smoke_pg"
+          },
+          "editorMode": "code",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "SELECT COALESCE((SELECT SUM(evaluation_batches) FROM analytics.v_calibration_confidence_summary), 0)::bigint AS total_evaluation_batches, COALESCE((SELECT COUNT(DISTINCT evidence_label) FROM analytics.v_dispersion_aq_evidence_summary), 0)::bigint AS distinct_dispersion_evidence_labels, (SELECT MIN(match_count) FROM analytics.risk_model_evaluations) AS min_match_count_in_evaluations, CASE WHEN NOT EXISTS (SELECT 1 FROM analytics.risk_model_evaluations) THEN 'no data / insufficient \u2014 no evaluation batches yet (exploratory)' WHEN (SELECT MIN(match_count) FROM analytics.risk_model_evaluations) IS NULL THEN 'no data / insufficient' WHEN (SELECT MIN(match_count) FROM analytics.risk_model_evaluations) < 3 THEN 'insufficient sample \u2014 correlation omitted below default threshold (exploratory)' ELSE 'meets default min_match threshold \u2014 engineering evidence only (not validation)' END AS minimum_sample_status_wording, 'Sparse or empty calibration panels mean insufficient data \u2014 not proof of model quality.' AS interpretation_hint",
+          "refId": "A"
+        }
+      ],
+      "title": "Calibration confidence banner (Phase 13)",
+      "type": "table"
+    },
+    {
+      "datasource": {
+        "type": "postgres",
+        "uid": "smoke_pg"
+      },
+      "fieldConfig": {
+        "defaults": {},
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 11,
+        "w": 12,
+        "x": 0,
+        "y": 5
+      },
+      "id": 10,
+      "options": {
+        "basemap": {
+          "config": {},
+          "name": "Layer 0",
+          "opacity": 1,
+          "tooltip": false,
+          "type": "default"
+        },
+        "controls": {
+          "mouseWheelZoom": true,
+          "showAttribution": true,
+          "showDebug": false,
+          "showMeasure": false,
+          "showScale": false,
+          "showZoom": true
+        },
+        "layers": [
+          {
+            "config": {
+              "showLegend": true,
+              "style": {
+                "color": {
+                  "field": "risk_band"
+                },
+                "opacity": 0.88,
+                "rotation": {
+                  "fixed": 0,
+                  "mode": "mod"
+                },
+                "size": {
+                  "fixed": 11,
+                  "max": 18,
+                  "min": 5
+                },
+                "symbol": {
+                  "fixed": "img/icons/marker/circle.svg",
+                  "mode": "fixed"
+                }
+              }
+            },
+            "filterData": {
+              "id": "byRefId",
+              "options": "A"
+            },
+            "name": "County risk (centroid)",
+            "opacity": 1,
+            "tooltip": true,
+            "type": "markers"
+          }
+        ],
+        "tooltip": {
+          "mode": "details"
+        },
+        "view": {
+          "allLayers": true,
+          "id": "fit",
+          "lat": 35.75,
+          "lon": -86.35,
+          "zoom": 6.5
+        }
+      },
+      "pluginVersion": "11.3.0",
+      "targets": [
+        {
+          "datasource": {
+            "type": "postgres",
+            "uid": "smoke_pg"
+          },
+          "editorMode": "code",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "SELECT centroid_longitude AS longitude, centroid_latitude AS latitude, risk_band::text AS risk_band, geoid::text AS geoid, risk_score, name FROM analytics.v_latest_smoke_risk_county_geojson WHERE model_version = 'v2' ORDER BY risk_score DESC NULLS LAST LIMIT 400;",
+          "refId": "A"
+        }
+      ],
+      "title": "County smoke risk (map \u2014 centroids)",
+      "type": "geomap"
+    },
+    {
+      "datasource": {
+        "type": "postgres",
+        "uid": "smoke_pg"
+      },
+      "fieldConfig": {
+        "defaults": {},
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 11,
+        "w": 12,
+        "x": 12,
+        "y": 5
+      },
+      "id": 11,
+      "options": {
+        "basemap": {
+          "config": {},
+          "name": "Layer 0",
+          "opacity": 1,
+          "tooltip": false,
+          "type": "default"
+        },
+        "controls": {
+          "mouseWheelZoom": true,
+          "showAttribution": true,
+          "showDebug": false,
+          "showMeasure": false,
+          "showScale": false,
+          "showZoom": true
+        },
+        "layers": [
+          {
+            "config": {
+              "showLegend": false,
+              "style": {
+                "color": {
+                  "fixed": "dark-orange"
+                },
+                "opacity": 0.75,
+                "rotation": {
+                  "fixed": 0,
+                  "mode": "mod"
+                },
+                "size": {
+                  "fixed": 7,
+                  "max": 14,
+                  "min": 3
+                },
+                "symbol": {
+                  "fixed": "img/icons/marker/circle.svg",
+                  "mode": "fixed"
+                }
+              }
+            },
+            "filterData": {
+              "id": "byRefId",
+              "options": "A"
+            },
+            "name": "Tract risk (centroid)",
+            "opacity": 1,
+            "tooltip": true,
+            "type": "markers"
+          }
+        ],
+        "tooltip": {
+          "mode": "details"
+        },
+        "view": {
+          "allLayers": true,
+          "id": "fit",
+          "lat": 35.75,
+          "lon": -86.35,
+          "zoom": 7.5
+        }
+      },
+      "pluginVersion": "11.3.0",
+      "targets": [
+        {
+          "datasource": {
+            "type": "postgres",
+            "uid": "smoke_pg"
+          },
+          "editorMode": "code",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "SELECT centroid_longitude AS longitude, centroid_latitude AS latitude, risk_band::text AS risk_band, geoid::text AS geoid, risk_score, name FROM analytics.v_latest_smoke_risk_tract_geojson WHERE model_version = 'v2' ORDER BY risk_score DESC NULLS LAST LIMIT 600;",
+          "refId": "A"
+        }
+      ],
+      "title": "Tract smoke risk (map \u2014 centroids)",
+      "type": "geomap"
+    },
+    {
+      "datasource": {
+        "type": "postgres",
+        "uid": "smoke_pg"
+      },
+      "fieldConfig": {
+        "defaults": {},
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 11,
+        "w": 12,
+        "x": 0,
+        "y": 16
+      },
+      "id": 12,
+      "options": {
+        "basemap": {
+          "config": {},
+          "name": "Layer 0",
+          "opacity": 1,
+          "tooltip": false,
+          "type": "default"
+        },
+        "controls": {
+          "mouseWheelZoom": true,
+          "showAttribution": true,
+          "showDebug": false,
+          "showMeasure": false,
+          "showScale": false,
+          "showZoom": true
+        },
+        "layers": [
+          {
+            "config": {
+              "showLegend": false,
+              "style": {
+                "color": {
+                  "fixed": "red"
+                },
+                "opacity": 0.85,
+                "rotation": {
+                  "fixed": 0,
+                  "mode": "mod"
+                },
+                "size": {
+                  "fixed": 9,
+                  "max": 15,
+                  "min": 4
+                },
+                "symbol": {
+                  "fixed": "img/icons/marker/circle.svg",
+                  "mode": "fixed"
+                }
+              }
+            },
+            "filterData": {
+              "id": "byRefId",
+              "options": "A"
+            },
+            "name": "Fires",
+            "opacity": 1,
+            "tooltip": true,
+            "type": "markers"
+          }
+        ],
+        "tooltip": {
+          "mode": "details"
+        },
+        "view": {
+          "allLayers": true,
+          "id": "fit",
+          "lat": 36.16,
+          "lon": -86.78,
+          "zoom": 7
+        }
+      },
+      "pluginVersion": "11.3.0",
+      "targets": [
+        {
+          "datasource": {
+            "type": "postgres",
+            "uid": "smoke_pg"
+          },
+          "editorMode": "code",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "SELECT longitude, latitude, detection_id::text AS detection_id, source::text AS source, acq_datetime, frp FROM analytics.v_latest_fire_detections_geojson LIMIT 400;",
+          "refId": "A"
+        }
+      ],
+      "title": "Fire detections (map)",
+      "type": "geomap"
+    },
+    {
+      "datasource": {
+        "type": "postgres",
+        "uid": "smoke_pg"
+      },
+      "fieldConfig": {
+        "defaults": {},
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 11,
+        "w": 12,
+        "x": 12,
+        "y": 16
+      },
+      "id": 13,
+      "options": {
+        "basemap": {
+          "config": {},
+          "name": "Layer 0",
+          "opacity": 1,
+          "tooltip": false,
+          "type": "default"
+        },
+        "controls": {
+          "mouseWheelZoom": true,
+          "showAttribution": true,
+          "showDebug": false,
+          "showMeasure": false,
+          "showScale": false,
+          "showZoom": true
+        },
+        "layers": [
+          {
+            "config": {
+              "showLegend": false,
+              "style": {
+                "color": {
+                  "field": "parameter"
+                },
+                "opacity": 0.85,
+                "rotation": {
+                  "fixed": 0,
+                  "mode": "mod"
+                },
+                "size": {
+                  "fixed": 9,
+                  "max": 15,
+                  "min": 4
+                },
+                "symbol": {
+                  "fixed": "img/icons/marker/circle.svg",
+                  "mode": "fixed"
+                }
+              }
+            },
+            "filterData": {
+              "id": "byRefId",
+              "options": "A"
+            },
+            "name": "AQ",
+            "opacity": 1,
+            "tooltip": true,
+            "type": "markers"
+          }
+        ],
+        "tooltip": {
+          "mode": "details"
+        },
+        "view": {
+          "allLayers": true,
+          "id": "fit",
+          "lat": 36.16,
+          "lon": -86.78,
+          "zoom": 7
+        }
+      },
+      "pluginVersion": "11.3.0",
+      "targets": [
+        {
+          "datasource": {
+            "type": "postgres",
+            "uid": "smoke_pg"
+          },
+          "editorMode": "code",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "SELECT longitude, latitude, parameter::text AS parameter, value, unit::text AS unit, measured_at FROM analytics.v_latest_air_quality_geojson LIMIT 400;",
+          "refId": "A"
+        }
+      ],
+      "title": "Air quality measurements (map)",
+      "type": "geomap"
+    },
+    {
+      "datasource": {
+        "type": "postgres",
+        "uid": "smoke_pg"
+      },
+      "fieldConfig": {
+        "defaults": {},
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 9,
+        "w": 24,
+        "x": 0,
+        "y": 27
+      },
+      "id": 3,
+      "options": {
+        "showHeader": true
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "postgres",
+            "uid": "smoke_pg"
+          },
+          "editorMode": "code",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "SELECT geography_type, geography_name, geoid, risk_score, risk_band, window_end, model_version, risk_rank FROM analytics.v_top_smoke_risk_areas WHERE risk_rank <= 20 ORDER BY model_version, risk_rank;",
+          "refId": "A"
+        }
+      ],
+      "title": "Top 20 risk geographies (per model)",
+      "type": "table"
+    },
+    {
+      "datasource": {
+        "type": "postgres",
+        "uid": "smoke_pg"
+      },
+      "fieldConfig": {
+        "defaults": {},
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 36
+      },
+      "id": 14,
+      "options": {
+        "showHeader": true
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "postgres",
+            "uid": "smoke_pg"
+          },
+          "editorMode": "code",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "SELECT geoid, name, risk_score, risk_band, centroid_latitude, centroid_longitude, LEFT(geojson_simplified::text, 120) AS geojson_preview FROM analytics.v_latest_smoke_risk_county_geojson WHERE model_version = 'v2' ORDER BY risk_score DESC NULLS LAST LIMIT 50;",
+          "refId": "A"
+        }
+      ],
+      "title": "County GeoJSON (truncated preview)",
+      "type": "table"
+    },
+    {
+      "datasource": {
+        "type": "postgres",
+        "uid": "smoke_pg"
+      },
+      "fieldConfig": {
+        "defaults": {},
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 36
+      },
+      "id": 15,
+      "options": {
+        "showHeader": true
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "postgres",
+            "uid": "smoke_pg"
+          },
+          "editorMode": "code",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "SELECT geoid, name, risk_score, risk_band, centroid_latitude, centroid_longitude, LEFT(geojson_simplified::text, 120) AS geojson_preview FROM analytics.v_latest_smoke_risk_tract_geojson WHERE model_version = 'v2' ORDER BY risk_score DESC NULLS LAST LIMIT 50;",
+          "refId": "A"
+        }
+      ],
+      "title": "Tract GeoJSON (truncated preview)",
+      "type": "table"
+    },
+    {
+      "datasource": {
+        "type": "postgres",
+        "uid": "smoke_pg"
+      },
+      "fieldConfig": {
+        "defaults": {},
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 9,
+        "w": 12,
+        "x": 0,
+        "y": 44
+      },
+      "id": 6,
+      "options": {
+        "showHeader": true
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "postgres",
+            "uid": "smoke_pg"
+          },
+          "editorMode": "code",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "SELECT source, mode, status, started_at, finished_at, records_fetched, records_published, records_failed, error_message FROM analytics.v_ingestion_run_status LIMIT 50;",
+          "refId": "A"
+        }
+      ],
+      "title": "Ingestion run status",
+      "type": "table"
+    },
+    {
+      "datasource": {
+        "type": "postgres",
+        "uid": "smoke_pg"
+      },
+      "fieldConfig": {
+        "defaults": {},
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 9,
+        "w": 12,
+        "x": 12,
+        "y": 44
+      },
+      "id": 7,
+      "options": {
+        "showHeader": true
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "postgres",
+            "uid": "smoke_pg"
+          },
+          "editorMode": "code",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "SELECT dataset, latest_event_time, latest_row_time FROM analytics.v_source_freshness;",
+          "refId": "A"
+        }
+      ],
+      "title": "Source freshness",
+      "type": "table"
+    },
+    {
+      "datasource": {
+        "type": "postgres",
+        "uid": "smoke_pg"
+      },
+      "fieldConfig": {
+        "defaults": {},
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 24,
+        "x": 0,
+        "y": 53
+      },
+      "id": 8,
+      "options": {
+        "showHeader": true
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "postgres",
+            "uid": "smoke_pg"
+          },
+          "editorMode": "code",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "SELECT metric, value FROM analytics.v_data_quality_summary ORDER BY metric;",
+          "refId": "A"
+        }
+      ],
+      "title": "Data quality summary (counts)",
+      "type": "table"
+    },
+    {
+      "datasource": {
+        "type": "postgres",
+        "uid": "smoke_pg"
+      },
+      "fieldConfig": {
+        "defaults": {},
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 9,
+        "w": 12,
+        "x": 0,
+        "y": 61
+      },
+      "id": 200,
+      "options": {
+        "showHeader": true
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "postgres",
+            "uid": "smoke_pg"
+          },
+          "editorMode": "code",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "SELECT alert_event_id, severity, alert_type, title, last_seen_at, runbook_slug FROM analytics.v_open_alert_events ORDER BY last_seen_at DESC LIMIT 50;",
+          "refId": "A"
+        }
+      ],
+      "title": "Open alert events",
+      "type": "table"
+    },
+    {
+      "datasource": {
+        "type": "postgres",
+        "uid": "smoke_pg"
+      },
+      "fieldConfig": {
+        "defaults": {},
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 9,
+        "w": 12,
+        "x": 12,
+        "y": 61
+      },
+      "id": 201,
+      "options": {
+        "showHeader": true
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "postgres",
+            "uid": "smoke_pg"
+          },
+          "editorMode": "code",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "SELECT notifier, status, attempt_count, last_attempted_at FROM analytics.v_notification_attempt_summary ORDER BY notifier, status;",
+          "refId": "A"
+        }
+      ],
+      "title": "Notification attempts (summary)",
+      "type": "table"
+    },
+    {
+      "datasource": {
+        "type": "postgres",
+        "uid": "smoke_pg"
+      },
+      "fieldConfig": {
+        "defaults": {},
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 9,
+        "w": 12,
+        "x": 0,
+        "y": 70
+      },
+      "id": 202,
+      "options": {
+        "showHeader": true
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "postgres",
+            "uid": "smoke_pg"
+          },
+          "editorMode": "code",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "SELECT attempted_at, notifier, alert_event_id, error_class, LEFT(error_message, 120) AS error_message, retry_after FROM analytics.v_notification_failures ORDER BY attempted_at DESC LIMIT 50;",
+          "refId": "A"
+        }
+      ],
+      "title": "Recent notification failures",
+      "type": "table"
+    },
+    {
+      "datasource": {
+        "type": "postgres",
+        "uid": "smoke_pg"
+      },
+      "fieldConfig": {
+        "defaults": {},
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 9,
+        "w": 12,
+        "x": 12,
+        "y": 70
+      },
+      "id": 203,
+      "options": {
+        "showHeader": true
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "postgres",
+            "uid": "smoke_pg"
+          },
+          "editorMode": "code",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "SELECT alert_event_id, notifier, last_status, success_count, failure_count, skipped_count FROM analytics.v_alert_delivery_state ORDER BY alert_event_id DESC LIMIT 80;",
+          "refId": "A"
+        }
+      ],
+      "title": "Alert delivery state (open)",
+      "type": "table"
+    },
+    {
+      "datasource": {
+        "type": "postgres",
+        "uid": "smoke_pg"
+      },
+      "fieldConfig": {
+        "defaults": {},
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 24,
+        "x": 0,
+        "y": 79
+      },
+      "id": 204,
+      "options": {
+        "showHeader": true
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "postgres",
+            "uid": "smoke_pg"
+          },
+          "editorMode": "code",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "SELECT operational_run_id, mode, started_at, finished_at, status, LEFT(error_message, 120) AS error_message FROM analytics.v_recent_operational_cycles ORDER BY started_at DESC LIMIT 30;",
+          "refId": "A"
+        }
+      ],
+      "title": "Recent operational cycles",
+      "type": "table"
+    },
+    {
+      "datasource": {
+        "type": "postgres",
+        "uid": "smoke_pg"
+      },
+      "fieldConfig": {
+        "defaults": {},
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 9,
+        "w": 12,
+        "x": 0,
+        "y": 88
+      },
+      "id": 300,
+      "options": {
+        "showHeader": true
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "postgres",
+            "uid": "smoke_pg"
+          },
+          "editorMode": "code",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "SELECT wind_observation_id, source, station_id, observed_at, wind_speed_mps, wind_direction_degrees, county_geoid FROM analytics.v_latest_wind_observations ORDER BY observed_at DESC NULLS LAST LIMIT 80;",
+          "refId": "A"
+        }
+      ],
+      "title": "Latest wind observations (normalized)",
+      "type": "table"
+    },
+    {
+      "datasource": {
+        "type": "postgres",
+        "uid": "smoke_pg"
+      },
+      "fieldConfig": {
+        "defaults": {},
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 10,
+        "w": 12,
+        "x": 12,
+        "y": 88
+      },
+      "id": 301,
+      "options": {
+        "basemap": {
+          "config": {},
+          "name": "Layer 0",
+          "opacity": 1,
+          "tooltip": false,
+          "type": "default"
+        },
+        "controls": {
+          "mouseWheelZoom": true,
+          "showAttribution": true,
+          "showDebug": false,
+          "showMeasure": false,
+          "showScale": false,
+          "showZoom": true
+        },
+        "layers": [
+          {
+            "config": {
+              "showLegend": false,
+              "style": {
+                "color": {
+                  "fixed": "semi-dark-blue"
+                },
+                "opacity": 0.85,
+                "rotation": {
+                  "fixed": 0,
+                  "mode": "mod"
+                },
+                "size": {
+                  "fixed": 8,
+                  "max": 14,
+                  "min": 4
+                },
+                "symbol": {
+                  "fixed": "img/icons/marker/triangle.svg",
+                  "mode": "fixed"
+                }
+              }
+            },
+            "filterData": {
+              "id": "byRefId",
+              "options": "A"
+            },
+            "name": "Wind",
+            "opacity": 1,
+            "tooltip": true,
+            "type": "markers"
+          }
+        ],
+        "tooltip": {
+          "mode": "details"
+        },
+        "view": {
+          "allLayers": true,
+          "id": "fit",
+          "lat": 36.16,
+          "lon": -86.78,
+          "zoom": 6
+        }
+      },
+      "pluginVersion": "11.3.0",
+      "targets": [
+        {
+          "datasource": {
+            "type": "postgres",
+            "uid": "smoke_pg"
+          },
+          "editorMode": "code",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "SELECT longitude, latitude, wind_observation_id::text AS wind_observation_id, wind_speed_mps, wind_direction_degrees FROM analytics.v_latest_wind_observations_geojson LIMIT 200;",
+          "refId": "A"
+        }
+      ],
+      "title": "Wind observations (map)",
+      "type": "geomap"
+    },
+    {
+      "datasource": {
+        "type": "postgres",
+        "uid": "smoke_pg"
+      },
+      "fieldConfig": {
+        "defaults": {},
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 9,
+        "w": 24,
+        "x": 0,
+        "y": 98
+      },
+      "id": 302,
+      "options": {
+        "showHeader": true
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "postgres",
+            "uid": "smoke_pg"
+          },
+          "editorMode": "code",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "SELECT exposure_rank, geography_type, geoid, exposure_score, detection_id, distance_km, angular_error_degrees, window_end, computed_at FROM analytics.v_top_plume_exposures ORDER BY exposure_rank ASC LIMIT 50;",
+          "refId": "A"
+        }
+      ],
+      "title": "Top plume exposures (wind_v1 corridor)",
+      "type": "table"
+    },
+    {
+      "datasource": {
+        "type": "postgres",
+        "uid": "smoke_pg"
+      },
+      "fieldConfig": {
+        "defaults": {},
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 7,
+        "w": 12,
+        "x": 0,
+        "y": 107
+      },
+      "id": 303,
+      "options": {
+        "showHeader": true
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "postgres",
+            "uid": "smoke_pg"
+          },
+          "editorMode": "code",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "SELECT * FROM analytics.v_smoke_transport_summary;",
+          "refId": "A"
+        }
+      ],
+      "title": "Smoke transport summary",
+      "type": "table"
+    },
+    {
+      "datasource": {
+        "type": "postgres",
+        "uid": "smoke_pg"
+      },
+      "fieldConfig": {
+        "defaults": {},
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 9,
+        "w": 12,
+        "x": 12,
+        "y": 107
+      },
+      "id": 304,
+      "options": {
+        "showHeader": true
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "postgres",
+            "uid": "smoke_pg"
+          },
+          "editorMode": "code",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "SELECT geography_type, geography_name, geoid, risk_score, risk_band, window_end, LEFT(explanation::text, 200) AS explanation_preview FROM analytics.v_latest_smoke_risk_v3 ORDER BY risk_score DESC NULLS LAST LIMIT 40;",
+          "refId": "A"
+        }
+      ],
+      "title": "Smoke risk v3 (latest rows)",
+      "type": "table"
+    },
+    {
+      "datasource": {
+        "type": "postgres",
+        "uid": "smoke_pg"
+      },
+      "fieldConfig": {
+        "defaults": {},
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 9,
+        "w": 12,
+        "x": 0,
+        "y": 116
+      },
+      "id": 305,
+      "options": {
+        "showHeader": true
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "postgres",
+            "uid": "smoke_pg"
+          },
+          "editorMode": "code",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "SELECT source_topic, target_dataset, error_class, occurrence_count, last_seen_at, error_message_preview AS error_preview, replay_hint FROM analytics.v_parse_errors_open LIMIT 80;",
+          "refId": "A"
+        }
+      ],
+      "title": "Open parse errors",
+      "type": "table"
+    },
+    {
+      "datasource": {
+        "type": "postgres",
+        "uid": "smoke_pg"
+      },
+      "fieldConfig": {
+        "defaults": {},
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 9,
+        "w": 12,
+        "x": 12,
+        "y": 116
+      },
+      "id": 306,
+      "options": {
+        "showHeader": true
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "postgres",
+            "uid": "smoke_pg"
+          },
+          "editorMode": "code",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "SELECT * FROM analytics.v_parse_error_summary LIMIT 80;",
+          "refId": "A"
+        }
+      ],
+      "title": "Parse error summary",
+      "type": "table"
+    },
+    {
+      "datasource": {
+        "type": "postgres",
+        "uid": "smoke_pg"
+      },
+      "fieldConfig": {
+        "defaults": {},
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 24,
+        "x": 0,
+        "y": 125
+      },
+      "id": 307,
+      "options": {
+        "showHeader": true
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "postgres",
+            "uid": "smoke_pg"
+          },
+          "editorMode": "code",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "SELECT source_topic, target_dataset, error_class, occurrence_count, last_seen_at, LEFT(error_message::text, 160) AS error_preview FROM analytics.v_parse_errors_recent LIMIT 120;",
+          "refId": "A"
+        }
+      ],
+      "title": "Recent parse errors (24h)",
+      "type": "table"
+    },
+    {
+      "datasource": {
+        "type": "postgres",
+        "uid": "smoke_pg"
+      },
+      "fieldConfig": {
+        "defaults": {},
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 133
+      },
+      "id": 308,
+      "options": {
+        "showHeader": true
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "postgres",
+            "uid": "smoke_pg"
+          },
+          "editorMode": "code",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "SELECT consumer_group, topic, partition, current_offset, last_processed_at, age_hours, last_successful_offset, last_error_offset FROM analytics.v_consumer_offset_state ORDER BY topic, partition LIMIT 80;",
+          "refId": "A"
+        }
+      ],
+      "title": "Consumer offset state (Spark normalizers)",
+      "type": "table"
+    },
+    {
+      "datasource": {
+        "type": "postgres",
+        "uid": "smoke_pg"
+      },
+      "fieldConfig": {
+        "defaults": {},
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 133
+      },
+      "id": 309,
+      "options": {
+        "showHeader": true
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "postgres",
+            "uid": "smoke_pg"
+          },
+          "editorMode": "code",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "SELECT * FROM analytics.v_dlq_operational_summary;",
+          "refId": "A"
+        }
+      ],
+      "title": "DLQ operational summary",
+      "type": "table"
+    },
+    {
+      "datasource": {
+        "type": "postgres",
+        "uid": "smoke_pg"
+      },
+      "fieldConfig": {
+        "defaults": {},
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 142
+      },
+      "id": 401,
+      "options": {
+        "showHeader": true
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "postgres",
+            "uid": "smoke_pg"
+          },
+          "editorMode": "code",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "SELECT topic, partition, low_watermark, high_watermark, depth_observed_at, approx_span_messages FROM analytics.v_kafka_topic_depth ORDER BY topic, partition LIMIT 120;",
+          "refId": "A"
+        }
+      ],
+      "title": "Kafka topic depth (latest watermark)",
+      "type": "table"
+    },
+    {
+      "datasource": {
+        "type": "postgres",
+        "uid": "smoke_pg"
+      },
+      "fieldConfig": {
+        "defaults": {},
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 142
+      },
+      "id": 402,
+      "options": {
+        "showHeader": true
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "postgres",
+            "uid": "smoke_pg"
+          },
+          "editorMode": "code",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "SELECT consumer_group, topic, partition, current_offset, high_watermark, lag, lag_observed_at FROM analytics.v_consumer_lag_latest ORDER BY lag DESC NULLS LAST LIMIT 80;",
+          "refId": "A"
+        }
+      ],
+      "title": "Consumer lag latest",
+      "type": "table"
+    },
+    {
+      "datasource": {
+        "type": "postgres",
+        "uid": "smoke_pg"
+      },
+      "fieldConfig": {
+        "defaults": {},
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 7,
+        "w": 24,
+        "x": 0,
+        "y": 150
+      },
+      "id": 403,
+      "options": {
+        "showHeader": true
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "postgres",
+            "uid": "smoke_pg"
+          },
+          "editorMode": "code",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "SELECT * FROM analytics.v_dlq_topic_depth;",
+          "refId": "A"
+        }
+      ],
+      "title": "DLQ topic depth proxy",
+      "type": "table"
+    },
+    {
+      "datasource": {
+        "type": "postgres",
+        "uid": "smoke_pg"
+      },
+      "fieldConfig": {
+        "defaults": {},
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 7,
+        "w": 24,
+        "x": 0,
+        "y": 157
+      },
+      "id": 404,
+      "options": {
+        "showHeader": true
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "postgres",
+            "uid": "smoke_pg"
+          },
+          "editorMode": "code",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "SELECT * FROM analytics.v_pipeline_lag_summary;",
+          "refId": "A"
+        }
+      ],
+      "title": "Pipeline lag summary",
+      "type": "table"
+    },
+    {
+      "datasource": {
+        "type": "postgres",
+        "uid": "smoke_pg"
+      },
+      "fieldConfig": {
+        "defaults": {},
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 164
+      },
+      "id": 405,
+      "options": {
+        "showHeader": true
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "postgres",
+            "uid": "smoke_pg"
+          },
+          "editorMode": "code",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "SELECT dlq_replay_run_id, source, dry_run, status, started_at, finished_at, records_scanned, records_replayed, records_resolved FROM analytics.v_dlq_replay_runs LIMIT 40;",
+          "refId": "A"
+        }
+      ],
+      "title": "DLQ replay runs",
+      "type": "table"
+    },
+    {
+      "datasource": {
+        "type": "postgres",
+        "uid": "smoke_pg"
+      },
+      "fieldConfig": {
+        "defaults": {},
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 164
+      },
+      "id": 406,
+      "options": {
+        "showHeader": true
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "postgres",
+            "uid": "smoke_pg"
+          },
+          "editorMode": "code",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "SELECT run_source, run_dry_run, status, source_topic, target_topic, created_at, error_message_preview FROM analytics.v_dlq_replay_items_recent LIMIT 80;",
+          "refId": "A"
+        }
+      ],
+      "title": "Recent DLQ replay items",
+      "type": "table"
+    },
+    {
+      "datasource": {
+        "type": "postgres",
+        "uid": "smoke_pg"
+      },
+      "fieldConfig": {
+        "defaults": {},
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 172
+      },
+      "id": 407,
+      "options": {
+        "showHeader": true
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "postgres",
+            "uid": "smoke_pg"
+          },
+          "editorMode": "code",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "SELECT weather_cell_id, source, grid_id, valid_time, latitude, longitude, wind_speed_mps, wind_direction_degrees, temperature_c, relative_humidity_percent FROM analytics.v_latest_weather_grid_cells ORDER BY valid_time DESC NULLS LAST LIMIT 200;",
+          "refId": "A"
+        }
+      ],
+      "title": "Latest weather grid cells",
+      "type": "table"
+    },
+    {
+      "datasource": {
+        "type": "postgres",
+        "uid": "smoke_pg"
+      },
+      "fieldConfig": {
+        "defaults": {},
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 172
+      },
+      "id": 408,
+      "options": {
+        "showHeader": true
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "postgres",
+            "uid": "smoke_pg"
+          },
+          "editorMode": "code",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "SELECT detection_id, weather_cell_id, match_method, distance_km, time_delta_minutes, wind_speed_mps, wind_direction_degrees, matched_at FROM analytics.v_fire_weather_matches ORDER BY matched_at DESC NULLS LAST LIMIT 200;",
+          "refId": "A"
+        }
+      ],
+      "title": "Fire\u2013weather matches",
+      "type": "table"
+    },
+    {
+      "datasource": {
+        "type": "postgres",
+        "uid": "smoke_pg"
+      },
+      "fieldConfig": {
+        "defaults": {},
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 7,
+        "w": 12,
+        "x": 0,
+        "y": 180
+      },
+      "id": 409,
+      "options": {
+        "showHeader": true
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "postgres",
+            "uid": "smoke_pg"
+          },
+          "editorMode": "code",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "SELECT * FROM analytics.v_fire_weather_match_summary;",
+          "refId": "A"
+        }
+      ],
+      "title": "Fire\u2013weather match summary",
+      "type": "table"
+    },
+    {
+      "datasource": {
+        "type": "postgres",
+        "uid": "smoke_pg"
+      },
+      "fieldConfig": {
+        "defaults": {},
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 7,
+        "w": 12,
+        "x": 12,
+        "y": 180
+      },
+      "id": 410,
+      "options": {
+        "showHeader": true
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "postgres",
+            "uid": "smoke_pg"
+          },
+          "editorMode": "code",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "SELECT * FROM analytics.v_grid_weather_operational_summary;",
+          "refId": "A"
+        }
+      ],
+      "title": "Grid weather operational summary",
+      "type": "table"
+    },
+    {
+      "datasource": {
+        "type": "postgres",
+        "uid": "smoke_pg"
+      },
+      "fieldConfig": {
+        "defaults": {},
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 187
+      },
+      "id": 411,
+      "options": {
+        "showHeader": true
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "postgres",
+            "uid": "smoke_pg"
+          },
+          "editorMode": "code",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "SELECT geography_type, geoid, risk_score, risk_band, model_version, computed_at, explanation FROM analytics.v_latest_smoke_risk_v4 ORDER BY risk_score DESC NULLS LAST LIMIT 200;",
+          "refId": "A"
+        }
+      ],
+      "title": "Smoke risk v4 (latest batch)",
+      "type": "table"
+    },
+    {
+      "datasource": {
+        "type": "postgres",
+        "uid": "smoke_pg"
+      },
+      "fieldConfig": {
+        "defaults": {},
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 187
+      },
+      "id": 412,
+      "options": {
+        "showHeader": true
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "postgres",
+            "uid": "smoke_pg"
+          },
+          "editorMode": "code",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "SELECT geography_type, geoid, detection_id, exposure_score, distance_km, wind_from_degrees, window_start, window_end, explanation FROM analytics.v_latest_smoke_plume_exposures_v2 ORDER BY exposure_score DESC NULLS LAST LIMIT 200;",
+          "refId": "A"
+        }
+      ],
+      "title": "Plume exposures wind_grid_v2 (latest batch)",
+      "type": "table"
+    },
+    {
+      "datasource": {
+        "type": "postgres",
+        "uid": "smoke_pg"
+      },
+      "fieldConfig": {
+        "defaults": {},
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 7,
+        "w": 12,
+        "x": 0,
+        "y": 195
+      },
+      "id": 413,
+      "options": {
+        "showHeader": true
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "postgres",
+            "uid": "smoke_pg"
+          },
+          "editorMode": "code",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "SELECT * FROM analytics.v_integration_pipeline_counts;",
+          "refId": "A"
+        }
+      ],
+      "title": "Integration pipeline counts",
+      "type": "table"
+    },
+    {
+      "datasource": {
+        "type": "postgres",
+        "uid": "smoke_pg"
+      },
+      "fieldConfig": {
+        "defaults": {},
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 7,
+        "w": 12,
+        "x": 12,
+        "y": 195
+      },
+      "id": 414,
+      "options": {
+        "showHeader": true
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "postgres",
+            "uid": "smoke_pg"
+          },
+          "editorMode": "code",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "SELECT * FROM analytics.v_fire_weather_unmatched ORDER BY acq_datetime DESC NULLS LAST LIMIT 200;",
+          "refId": "A"
+        }
+      ],
+      "title": "Fire\u2013weather unmatched (24h)",
+      "type": "table"
+    },
+    {
+      "datasource": {
+        "type": "postgres",
+        "uid": "smoke_pg"
+      },
+      "fieldConfig": {
+        "defaults": {},
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 202
+      },
+      "id": 415,
+      "options": {
+        "showHeader": true
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "postgres",
+            "uid": "smoke_pg"
+          },
+          "editorMode": "code",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "SELECT geography_type, geoid, risk_score, risk_band, computed_at, explanation FROM analytics.v_latest_risk_v4_explanations ORDER BY risk_score DESC NULLS LAST LIMIT 200;",
+          "refId": "A"
+        }
+      ],
+      "title": "Latest v4 risk explanations",
+      "type": "table"
+    },
+    {
+      "datasource": {
+        "type": "postgres",
+        "uid": "smoke_pg"
+      },
+      "fieldConfig": {
+        "defaults": {},
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 202
+      },
+      "id": 416,
+      "options": {
+        "showHeader": true
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "postgres",
+            "uid": "smoke_pg"
+          },
+          "editorMode": "code",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "SELECT risk_observation_id, observed_at, geography_type, geoid, observation_type, observed_value, source FROM analytics.risk_observations ORDER BY observed_at DESC LIMIT 200;",
+          "refId": "A"
+        }
+      ],
+      "title": "Risk observations",
+      "type": "table"
+    },
+    {
+      "datasource": {
+        "type": "postgres",
+        "uid": "smoke_pg"
+      },
+      "fieldConfig": {
+        "defaults": {},
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 7,
+        "w": 12,
+        "x": 0,
+        "y": 210
+      },
+      "id": 417,
+      "options": {
+        "showHeader": true
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "postgres",
+            "uid": "smoke_pg"
+          },
+          "editorMode": "code",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "SELECT risk_model_evaluation_id, model_version, evaluated_at, window_start, window_end, observation_type, match_count, mae, rmse FROM analytics.risk_model_evaluations ORDER BY evaluated_at DESC LIMIT 80;",
+          "refId": "A"
+        }
+      ],
+      "title": "Risk model evaluations",
+      "type": "table"
+    },
+    {
+      "datasource": {
+        "type": "postgres",
+        "uid": "smoke_pg"
+      },
+      "fieldConfig": {
+        "defaults": {},
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 7,
+        "w": 12,
+        "x": 12,
+        "y": 210
+      },
+      "id": 418,
+      "options": {
+        "showHeader": true
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "postgres",
+            "uid": "smoke_pg"
+          },
+          "editorMode": "code",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "SELECT * FROM analytics.v_risk_calibration_summary;",
+          "refId": "A"
+        }
+      ],
+      "title": "Risk calibration summary",
+      "type": "table"
+    },
+    {
+      "datasource": {
+        "type": "postgres",
+        "uid": "smoke_pg"
+      },
+      "fieldConfig": {
+        "defaults": {},
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 7,
+        "w": 12,
+        "x": 0,
+        "y": 217
+      },
+      "id": 419,
+      "options": {
+        "showHeader": true
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "postgres",
+            "uid": "smoke_pg"
+          },
+          "editorMode": "code",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "SELECT geography_type, geoid, detection_id, dispersion_score, distance_km, downwind_distance_km, window_start, window_end FROM analytics.v_latest_smoke_dispersion_exposures ORDER BY dispersion_score DESC NULLS LAST LIMIT 200;",
+          "refId": "A"
+        }
+      ],
+      "title": "Latest dispersion exposures (gaussian_v0)",
+      "type": "table"
+    },
+    {
+      "datasource": {
+        "type": "postgres",
+        "uid": "smoke_pg"
+      },
+      "fieldConfig": {
+        "defaults": {},
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 7,
+        "w": 12,
+        "x": 12,
+        "y": 217
+      },
+      "id": 420,
+      "options": {
+        "showHeader": true
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "postgres",
+            "uid": "smoke_pg"
+          },
+          "editorMode": "code",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "SELECT * FROM analytics.v_top_dispersion_exposures LIMIT 100;",
+          "refId": "A"
+        }
+      ],
+      "title": "Top dispersion exposures (latest window)",
+      "type": "table"
+    },
+    {
+      "datasource": {
+        "type": "postgres",
+        "uid": "smoke_pg"
+      },
+      "fieldConfig": {
+        "defaults": {},
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 6,
+        "w": 24,
+        "x": 0,
+        "y": 224
+      },
+      "id": 421,
+      "options": {
+        "showHeader": true
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "postgres",
+            "uid": "smoke_pg"
+          },
+          "editorMode": "code",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "SELECT * FROM analytics.v_dispersion_operational_summary;",
+          "refId": "A"
+        }
+      ],
+      "title": "Dispersion operational summary",
+      "type": "table"
+    },
+    {
+      "datasource": {
+        "type": "postgres",
+        "uid": "smoke_pg"
+      },
+      "fieldConfig": {
+        "defaults": {},
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 7,
+        "w": 12,
+        "x": 0,
+        "y": 230
+      },
+      "id": 422,
+      "options": {
+        "showHeader": true
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "postgres",
+            "uid": "smoke_pg"
+          },
+          "editorMode": "code",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "SELECT geography_type, geoid, lag_bucket, evidence_label, max_dispersion_score, avg_pm25, avg_pm10, aq_observation_count, comparison_score FROM analytics.v_dispersion_aq_comparisons LIMIT 200;",
+          "refId": "A"
+        }
+      ],
+      "title": "Dispersion vs AQ lag comparisons",
+      "type": "table"
+    },
+    {
+      "datasource": {
+        "type": "postgres",
+        "uid": "smoke_pg"
+      },
+      "fieldConfig": {
+        "defaults": {},
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 7,
+        "w": 12,
+        "x": 12,
+        "y": 230
+      },
+      "id": 423,
+      "options": {
+        "showHeader": true
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "postgres",
+            "uid": "smoke_pg"
+          },
+          "editorMode": "code",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "SELECT geography_type, geoid, risk_score, risk_band, computed_at, explanation FROM analytics.v_latest_smoke_risk_v5 ORDER BY risk_score DESC NULLS LAST LIMIT 200;",
+          "refId": "A"
+        }
+      ],
+      "title": "Latest smoke risk v5",
+      "type": "table"
+    },
+    {
+      "datasource": {
+        "type": "postgres",
+        "uid": "smoke_pg"
+      },
+      "fieldConfig": {
+        "defaults": {},
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 24,
+        "x": 0,
+        "y": 237
+      },
+      "id": 424,
+      "options": {
+        "showHeader": true
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "postgres",
+            "uid": "smoke_pg"
+          },
+          "editorMode": "code",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "SELECT dispersion_exposure_id, detection_id, geography_type, geoid, dispersion_score, concentration_proxy, explanation FROM analytics.v_dispersion_model_debug;",
+          "refId": "A"
+        }
+      ],
+      "title": "Dispersion debug (truncated)",
+      "type": "table"
+    },
+    {
+      "datasource": {
+        "type": "postgres",
+        "uid": "smoke_pg"
+      },
+      "fieldConfig": {
+        "defaults": {},
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 6,
+        "w": 12,
+        "x": 0,
+        "y": 245
+      },
+      "id": 425,
+      "options": {
+        "showHeader": true
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "postgres",
+            "uid": "smoke_pg"
+          },
+          "editorMode": "code",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "SELECT * FROM analytics.v_dispersion_aq_evidence_summary ORDER BY comparison_row_count DESC LIMIT 100;",
+          "refId": "A"
+        }
+      ],
+      "title": "Dispersion AQ evidence summary",
+      "type": "table"
+    },
+    {
+      "datasource": {
+        "type": "postgres",
+        "uid": "smoke_pg"
+      },
+      "fieldConfig": {
+        "defaults": {},
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 6,
+        "w": 12,
+        "x": 12,
+        "y": 245
+      },
+      "id": 426,
+      "options": {
+        "showHeader": true
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "postgres",
+            "uid": "smoke_pg"
+          },
+          "editorMode": "code",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "SELECT * FROM analytics.v_dispersion_aq_lag_summary ORDER BY lag_bucket LIMIT 50;",
+          "refId": "A"
+        }
+      ],
+      "title": "Dispersion AQ lag summary",
+      "type": "table"
+    },
+    {
+      "datasource": {
+        "type": "postgres",
+        "uid": "smoke_pg"
+      },
+      "fieldConfig": {
+        "defaults": {},
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 6,
+        "w": 12,
+        "x": 0,
+        "y": 251
+      },
+      "id": 427,
+      "options": {
+        "showHeader": true
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "postgres",
+            "uid": "smoke_pg"
+          },
+          "editorMode": "code",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "SELECT * FROM analytics.v_risk_model_evaluation_latest LIMIT 50;",
+          "refId": "A"
+        }
+      ],
+      "title": "Latest risk model evaluation",
+      "type": "table"
+    },
+    {
+      "datasource": {
+        "type": "postgres",
+        "uid": "smoke_pg"
+      },
+      "fieldConfig": {
+        "defaults": {},
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 6,
+        "w": 12,
+        "x": 12,
+        "y": 251
+      },
+      "id": 428,
+      "options": {
+        "showHeader": true
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "postgres",
+            "uid": "smoke_pg"
+          },
+          "editorMode": "code",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "SELECT model_version, evaluated_at, match_count, mae, rmse, correlation, confidence_label, insufficient_data_reason FROM analytics.v_risk_model_evaluation_history LIMIT 100;",
+          "refId": "A"
+        }
+      ],
+      "title": "Risk model evaluation history",
+      "type": "table"
+    },
+    {
+      "datasource": {
+        "type": "postgres",
+        "uid": "smoke_pg"
+      },
+      "fieldConfig": {
+        "defaults": {},
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 6,
+        "w": 12,
+        "x": 0,
+        "y": 257
+      },
+      "id": 429,
+      "options": {
+        "showHeader": true
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "postgres",
+            "uid": "smoke_pg"
+          },
+          "editorMode": "code",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "SELECT geography_type, geoid, lag_bucket, evidence_label, max_dispersion_score, avg_pm25, aq_observation_count FROM analytics.v_model_overprediction_candidates ORDER BY max_dispersion_score DESC NULLS LAST LIMIT 100;",
+          "refId": "A"
+        }
+      ],
+      "title": "Overprediction candidates",
+      "type": "table"
+    },
+    {
+      "datasource": {
+        "type": "postgres",
+        "uid": "smoke_pg"
+      },
+      "fieldConfig": {
+        "defaults": {},
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 6,
+        "w": 12,
+        "x": 12,
+        "y": 257
+      },
+      "id": 430,
+      "options": {
+        "showHeader": true
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "postgres",
+            "uid": "smoke_pg"
+          },
+          "editorMode": "code",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "SELECT geography_type, geoid, lag_bucket, evidence_label, max_dispersion_score, avg_pm25, aq_observation_count FROM analytics.v_model_underprediction_candidates ORDER BY avg_pm25 DESC NULLS LAST LIMIT 100;",
+          "refId": "A"
+        }
+      ],
+      "title": "Underprediction candidates",
+      "type": "table"
+    },
+    {
+      "datasource": {
+        "type": "postgres",
+        "uid": "smoke_pg"
+      },
+      "fieldConfig": {
+        "defaults": {},
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 6,
+        "w": 12,
+        "x": 0,
+        "y": 263
+      },
+      "id": 431,
+      "options": {
+        "showHeader": true
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "postgres",
+            "uid": "smoke_pg"
+          },
+          "editorMode": "code",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "SELECT * FROM analytics.v_calibration_confidence_summary;",
+          "refId": "A"
+        }
+      ],
+      "title": "Calibration confidence summary",
+      "type": "table"
+    },
+    {
+      "datasource": {
+        "type": "postgres",
+        "uid": "smoke_pg"
+      },
+      "fieldConfig": {
+        "defaults": {},
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 6,
+        "w": 12,
+        "x": 12,
+        "y": 263
+      },
+      "id": 432,
+      "options": {
+        "showHeader": true
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "postgres",
+            "uid": "smoke_pg"
+          },
+          "editorMode": "code",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "SELECT * FROM analytics.v_risk_observation_coverage ORDER BY observation_rows DESC LIMIT 200;",
+          "refId": "A"
+        }
+      ],
+      "title": "Risk observation coverage",
+      "type": "table"
+    }
+  ],
+  "refresh": "30s",
+  "schemaVersion": 39,
+  "tags": [
+    "smoke",
+    "wildfire",
+    "phase3",
+    "phase5",
+    "phase6",
+    "phase7",
+    "phase8",
+    "phase9",
+    "phase10",
+    "phase11",
+    "phase12",
+    "phase13"
+  ],
+  "templating": {
+    "list": []
+  },
+  "time": {
+    "from": "now-7d",
+    "to": "now"
+  },
+  "timepicker": {},
+  "timezone": "browser",
+  "title": "Wildfire Smoke Risk (Phase 3\u201312 ops)",
+  "uid": "wildfire-smoke-phase2",
+  "version": 6,
+  "weekStart": ""
+}

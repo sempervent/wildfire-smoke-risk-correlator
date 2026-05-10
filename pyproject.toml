@@ -1,0 +1,37 @@
+[project]
+name = "wildfire-smoke-risk-correlator"
+version = "1.0.1"
+description = "Kafka + Spark + PostGIS wildfire and smoke-risk correlator (local vertical slice)."
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = [
+  "httpx>=0.27",
+  "kafka-python-ng>=2.2",
+  "psycopg[binary]>=3.2",
+  "pyyaml>=6.0",
+  "python-dotenv>=1.0",
+]
+
+[project.optional-dependencies]
+dev = [
+  "pytest>=8.2",
+  "ruff>=0.6",
+]
+parquet = [
+  "pyarrow>=16.0",
+]
+
+[build-system]
+requires = ["hatchling>=1.25"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/wildfire_smoke"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["src"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"

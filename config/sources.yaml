@@ -1,0 +1,42 @@
+firms:
+  base_url: "https://firms.modaps.eosdis.nasa.gov/api/area/csv"
+  # Defaults match repository ENV defaults; override via FIRMS_* environment variables.
+  source_default: "VIIRS_SNPP_NRT"
+  bbox_default: "-125,24,-66,50"
+  day_range_default: 1
+
+openaq:
+  base_url: "https://api.openaq.org/v3"
+  # OpenAQ parameter IDs evolve; defaults target pm25/pm10-style core particles.
+  parameter_ids: [2, 3]
+  bbox_default: "-125,24,-66,50"
+  locations_limit: 1000
+  measurements_limit: 1000
+  measurements_hours_back: 48
+  max_pages: 50
+  http_timeout_seconds: 60
+  max_retries: 5
+  backoff_seconds_base: 1.5
+
+grid_weather:
+  bbox_default: "-88.2,34.9,-81.6,36.7"
+  max_points_default: 100
+  lookahead_hours_default: 24
+  cell_size_degrees_default: 0.05
+
+kafka:
+  firms_raw_topic: "firms.hotspots.raw"
+  firms_dlq_topic: "firms.hotspots.dlq"
+  openaq_raw_topic: "openaq.measurements.raw"
+  openaq_dlq_topic: "openaq.measurements.dlq"
+  wind_raw_topic: "weather.wind.raw"
+  wind_dlq_topic: "weather.wind.dlq"
+  wind_normalized_topic: "weather.wind.normalized"
+  grid_weather_raw_topic: "weather.grid.raw"
+  grid_weather_dlq_topic: "weather.grid.dlq"
+  grid_weather_normalized_topic: "weather.grid.normalized"
+  fire_normalized_topic: "fire.detections.normalized"
+  air_quality_normalized_topic: "air_quality.measurements.normalized"
+  normalization_errors_topic: "normalization.errors"
+  smoke_risk_topic: "smoke.risk.scores"
+  deadletter_topic: "deadletter.events"

@@ -1,0 +1,36 @@
+# Python
+.venv/
+__pycache__/
+*.py[cod]
+*.egg-info/
+.dist/
+build/
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+
+# Env / secrets
+.env
+.env.local
+*.pem
+
+# Data artifacts
+artifacts/
+data/raw/census/
+data/raw/fixtures/
+*.zip
+*.shp
+*.dbf
+*.shx
+*.prj
+*.cpg
+
+# IDE / OS
+.idea/
+.vscode/
+.DS_Store
+
+# Spark / logs
+spark-warehouse/
+metastore_db/
+derby.log

@@ -1,0 +1,20 @@
+{
+  "type": "FeatureCollection",
+  "features": [
+    {
+      "type": "Feature",
+      "geometry": {"type": "Point", "coordinates": [-86.6012, 36.1627]},
+      "properties": {"stationIdentifier": "KBNA", "name": "Nashville"}
+    },
+    {
+      "type": "Feature",
+      "geometry": {"type": "Point", "coordinates": [-83.9942, 35.9606]},
+      "properties": {"stationIdentifier": "KTYS", "name": "Knoxville"}
+    },
+    {
+      "type": "Feature",
+      "geometry": {"type": "Point", "coordinates": [-118.2437, 34.0522]},
+      "properties": {"stationIdentifier": "KLAX", "name": "Los Angeles (outside TN bbox fixture)"}
+    }
+  ]
+}

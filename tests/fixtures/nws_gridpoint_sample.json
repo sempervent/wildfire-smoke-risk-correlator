@@ -1,0 +1,23 @@
+{
+  "grid_id": "fixture-grid-tn-1",
+  "valid_time": "2026-05-09T18:00:00+00:00",
+  "cells": [
+    {
+      "latitude": 36.1627,
+      "longitude": -86.7816,
+      "wind_speed_mps": 4.2,
+      "wind_direction_degrees": 220,
+      "temperature_c": 19.0,
+      "relative_humidity_percent": 55.0
+    },
+    {
+      "latitude": 35.96,
+      "longitude": -83.92,
+      "windSpeed": "15 km/h",
+      "windDirection": 200,
+      "temperature": 66.0,
+      "temperature_unit": "F",
+      "relativeHumidity": 48.0
+    }
+  ]
+}

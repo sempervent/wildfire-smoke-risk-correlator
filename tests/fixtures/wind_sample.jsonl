@@ -1,0 +1,2 @@
+{"wind_observation_id": "wo-fix-nashville-1", "source": "fixture", "station_id": "KTYS", "observed_at": "2024-06-01T18:00:00+00:00", "latitude": 36.1189, "longitude": -86.6892, "wind_speed_mps": 5.2, "wind_direction_degrees": 270, "wind_gust_mps": 8.1}
+{"wind_observation_id": "wo-fix-chatt-1", "source": "fixture", "station_id": "KCHA", "observed_at": "2024-06-01T17:30:00+00:00", "latitude": 35.0353, "longitude": -85.2038, "wind_speed_mps": 3.0, "wind_direction_degrees": 225, "wind_gust_mps": null}

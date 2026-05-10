@@ -1,0 +1,12 @@
+[Unit]
+Description=Wildfire smoke correlator operational cycle (runs make operational-cycle)
+After=network-online.target docker.service
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+# Edit WorkingDirectory to your git checkout path.
+WorkingDirectory=/ABSOLUTE/PATH/TO/wildfire-smoke-risk-correlator
+Environment=LIVE_MODE=0
+EnvironmentFile=-/ABSOLUTE/PATH/TO/wildfire-smoke-risk-correlator/.env
+ExecStart=/usr/bin/make operational-cycle

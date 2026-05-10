@@ -1,0 +1,53 @@
+{
+  "type": "FeatureCollection",
+  "name": "census_minimal_counties_ci_fixture",
+  "note": "Synthetic boxes for CI only — not operational Census boundaries.",
+  "features": [
+    {
+      "type": "Feature",
+      "properties": {
+        "geoid": "47037",
+        "statefp": "47",
+        "countyfp": "037",
+        "name": "Davidson County (minimal CI fixture)",
+        "aland": 1000000,
+        "awater": 0
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [-86.92, 36.08],
+            [-86.72, 36.08],
+            [-86.72, 36.28],
+            [-86.92, 36.28],
+            [-86.92, 36.08]
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "geoid": "47189",
+        "statefp": "47",
+        "countyfp": "189",
+        "name": "County 47189 (minimal CI fixture)",
+        "aland": 1000000,
+        "awater": 0
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [-86.72, 36.08],
+            [-86.52, 36.08],
+            [-86.52, 36.28],
+            [-86.72, 36.28],
+            [-86.72, 36.08]
+          ]
+        ]
+      }
+    }
+  ]
+}

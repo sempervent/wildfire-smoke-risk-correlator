@@ -1,0 +1,95 @@
+# Maps analytics.fn_alert_candidates.alert_type values to operator docs under docs/runbooks/.
+mappings:
+  ingestion_failed:
+    slug: ingestion-failure
+    path: docs/runbooks/ingestion-failure.md
+  stale_firms_normalized:
+    slug: stale-firms-source
+    path: docs/runbooks/stale-firms-source.md
+  stale_openaq_normalized:
+    slug: stale-openaq-source
+    path: docs/runbooks/stale-openaq-source.md
+  no_recent_fire_detections:
+    slug: no-recent-fire-data
+    path: docs/runbooks/no-recent-fire-data.md
+  no_recent_air_quality:
+    slug: no-recent-aq-data
+    path: docs/runbooks/no-recent-aq-data.md
+  high_smoke_risk:
+    slug: high-smoke-risk
+    path: docs/runbooks/high-smoke-risk.md
+  high_plume_exposure:
+    slug: high-plume-exposure
+    path: docs/runbooks/high-plume-exposure.md
+  wind_data_stale:
+    slug: stale-wind-source
+    path: docs/runbooks/stale-wind-source.md
+  no_recent_wind_data:
+    slug: no-recent-wind-data
+    path: docs/runbooks/no-recent-wind-data.md
+  parse_errors_high:
+    slug: parse-errors-high
+    path: docs/runbooks/parse-errors-high.md
+  parser_failure_spike:
+    slug: parser-failure-spike
+    path: docs/runbooks/parser-failure-spike.md
+  dlq_records_present:
+    slug: dlq-records-present
+    path: docs/runbooks/dlq-records-present.md
+  consumer_offset_stale:
+    slug: consumer-offset-stale
+    path: docs/runbooks/consumer-offset-stale.md
+  kafka_lag_high:
+    slug: kafka-lag-high
+    path: docs/runbooks/kafka-lag-high.md
+  dlq_depth_high:
+    slug: dlq-depth-high
+    path: docs/runbooks/dlq-depth-high.md
+  replay_failures_recent:
+    slug: replay-failures-recent
+    path: docs/runbooks/replay-failures-recent.md
+  grid_weather_stale:
+    slug: grid-weather-stale
+    path: docs/runbooks/grid-weather-stale.md
+  no_recent_grid_weather:
+    slug: no-recent-grid-weather
+    path: docs/runbooks/no-recent-grid-weather.md
+  fire_weather_unmatched_high:
+    slug: fire-weather-unmatched-high
+    path: docs/runbooks/fire-weather-unmatched-high.md
+  grid_weather_parse_errors_high:
+    slug: grid-weather-parse-errors-high
+    path: docs/runbooks/parse-errors-high.md
+  integration_pipeline_incomplete:
+    slug: integration-pipeline-incomplete
+    path: docs/runbooks/integration-pipeline-incomplete.md
+  v4_risk_missing:
+    slug: v4-risk-missing
+    path: docs/runbooks/v4-risk-missing.md
+  fire_weather_match_missing:
+    slug: fire-weather-match-missing
+    path: docs/runbooks/fire-weather-match-missing.md
+  high_dispersion_exposure:
+    slug: high-dispersion-exposure
+    path: docs/runbooks/high-dispersion-exposure.md
+  dispersion_no_wind_matches:
+    slug: dispersion-no-wind-matches
+    path: docs/runbooks/dispersion-no-wind-matches.md
+  dispersion_no_targets:
+    slug: dispersion-no-targets
+    path: docs/runbooks/dispersion-no-targets.md
+  dispersion_aq_mismatch_high:
+    slug: dispersion-aq-mismatch-high
+    path: docs/runbooks/dispersion-aq-mismatch-high.md
+  model_overprediction_possible:
+    slug: model-overprediction-possible
+    path: docs/runbooks/model-overprediction-possible.md
+  model_underprediction_possible:
+    slug: model-underprediction-possible
+    path: docs/runbooks/model-underprediction-possible.md
+  calibration_insufficient_data:
+    slug: calibration-insufficient-data
+    path: docs/runbooks/calibration-insufficient-data.md
+  aq_observation_coverage_low:
+    slug: aq-observation-coverage-low
+    path: docs/runbooks/aq-observation-coverage-low.md
