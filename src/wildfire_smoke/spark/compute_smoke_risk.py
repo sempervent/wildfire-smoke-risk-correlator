@@ -10,7 +10,12 @@ from psycopg.rows import dict_row
 from psycopg.types.json import Json
 
 from wildfire_smoke.db.connection import connect
-from wildfire_smoke.risk import compute_risk_score_fields, compute_risk_score_v2_fields, compute_risk_score_v3_fields
+from wildfire_smoke.risk import (
+    compute_risk_score_fields,
+    compute_risk_score_v2_fields,
+    compute_risk_score_v3_fields,
+    compute_risk_score_v4_fields,
+)
 from wildfire_smoke.settings import Settings, kafka_topics
 
 log = logging.getLogger(__name__)
@@ -244,10 +249,9 @@ def _v2_sql_params(window_start: datetime, window_end: datetime, radius_m: float
     )
 
 
-WIND_PLUME_MODEL_VERSION = "wind_v1"
-
-
-def _plume_max_by_geography(conn, window_start: datetime, window_end: datetime) -> dict[tuple[str, str], tuple[float, int]]:
+def _plume_max_by_geography_model(
+    conn, window_start: datetime, window_end: datetime, plume_model_version: str
+) -> dict[tuple[str, str], tuple[float, int]]:
     with conn.cursor(row_factory=dict_row) as cur:
         cur.execute(
             """
@@ -258,13 +262,84 @@ def _plume_max_by_geography(conn, window_start: datetime, window_end: datetime) 
             WHERE window_start = %s AND window_end = %s AND model_version = %s
             GROUP BY geography_type, geoid
             """,
-            (window_start, window_end, WIND_PLUME_MODEL_VERSION),
+            (window_start, window_end, plume_model_version),
         )
         rows = cur.fetchall()
     out: dict[tuple[str, str], tuple[float, int]] = {}
     for r in rows:
         out[(str(r["geography_type"]), str(r["geoid"]))] = (float(r["max_plume"]), int(r["det_count"]))
     return out
+
+
+def _grid_weather_stats_by_geography(
+    conn, window_start: datetime, window_end: datetime
+) -> dict[tuple[str, str], tuple[float | None, int]]:
+    out: dict[tuple[str, str], tuple[float | None, int]] = {}
+    with conn.cursor(row_factory=dict_row) as cur:
+        cur.execute(
+            """
+            SELECT 'county'::text AS geography_type, county_geoid AS geoid,
+                   AVG(relative_humidity_percent)::double precision AS avg_rh,
+                   COUNT(*)::int AS ncells
+            FROM normalized.weather_grid_cells
+            WHERE county_geoid IS NOT NULL
+              AND valid_time >= %s AND valid_time < %s
+            GROUP BY county_geoid
+            """,
+            (window_start, window_end),
+        )
+        for r in cur.fetchall():
+            out[("county", str(r["geoid"]))] = (
+                float(r["avg_rh"]) if r.get("avg_rh") is not None else None,
+                int(r["ncells"]),
+            )
+        cur.execute(
+            """
+            SELECT 'tract'::text AS geography_type, tract_geoid AS geoid,
+                   AVG(relative_humidity_percent)::double precision AS avg_rh,
+                   COUNT(*)::int AS ncells
+            FROM normalized.weather_grid_cells
+            WHERE tract_geoid IS NOT NULL
+              AND valid_time >= %s AND valid_time < %s
+            GROUP BY tract_geoid
+            """,
+            (window_start, window_end),
+        )
+        for r in cur.fetchall():
+            out[("tract", str(r["geoid"]))] = (
+                float(r["avg_rh"]) if r.get("avg_rh") is not None else None,
+                int(r["ncells"]),
+            )
+    return out
+
+
+def _v4_plume_selection(
+    settings: Settings,
+    grid_plumes: dict[tuple[str, str], tuple[float, int]],
+    station_plumes: dict[tuple[str, str], tuple[float, int]],
+) -> tuple[dict[tuple[str, str], tuple[float, int]], dict[tuple[str, str], bool]]:
+    """Pick per-geography plume score for v4; value tuple is (max_score, det_count)."""
+
+    keys = set(grid_plumes.keys()) | set(station_plumes.keys())
+    chosen: dict[tuple[str, str], tuple[float, int]] = {}
+    fallback: dict[tuple[str, str], bool] = {}
+    for k in keys:
+        g_max, g_det = grid_plumes.get(k, (0.0, 0))
+        s_max, s_det = station_plumes.get(k, (0.0, 0))
+        if settings.plume_model_version == "wind_grid_v2":
+            if g_max > 0:
+                chosen[k] = (g_max, g_det)
+                fallback[k] = False
+            elif settings.plume_grid_fallback_to_station and s_max > 0:
+                chosen[k] = (s_max, s_det)
+                fallback[k] = True
+            else:
+                chosen[k] = (0.0, 0)
+                fallback[k] = False
+        else:
+            chosen[k] = (s_max, s_det)
+            fallback[k] = False
+    return chosen, fallback
 
 
 def _has_activity_v2(row: dict) -> bool:
@@ -345,7 +420,7 @@ def main() -> None:
                     cur.execute(TRACT_V1_SQL, (window_start, window_end, window_start, window_end))
                     for r in cur.fetchall():
                         rows_out.append({**dict(r), "geography_type": "tract"})
-            elif model_version in {"v2", "v3"}:
+            elif model_version in {"v2", "v3", "v4"}:
                 params = _v2_sql_params(window_start, window_end, radius_m)
                 if geographies in {"county", "both"}:
                     cur.execute(COUNTY_V2_SQL, params)
@@ -371,9 +446,18 @@ def main() -> None:
     )
 
     plume_by_geo: dict[tuple[str, str], tuple[float, int]] = {}
+    plume_by_geo_v4: dict[tuple[str, str], tuple[float, int]] = {}
+    plume_fallback_v4: dict[tuple[str, str], bool] = {}
+    grid_stats: dict[tuple[str, str], tuple[float | None, int]] = {}
     if model_version == "v3":
         with connect(settings) as conn:
-            plume_by_geo = _plume_max_by_geography(conn, window_start, window_end)
+            plume_by_geo = _plume_max_by_geography_model(conn, window_start, window_end, "wind_v1")
+    elif model_version == "v4":
+        with connect(settings) as conn:
+            grid_plumes = _plume_max_by_geography_model(conn, window_start, window_end, "wind_grid_v2")
+            station_plumes = _plume_max_by_geography_model(conn, window_start, window_end, "wind_v1")
+            plume_by_geo_v4, plume_fallback_v4 = _v4_plume_selection(settings, grid_plumes, station_plumes)
+            grid_stats = _grid_weather_stats_by_geography(conn, window_start, window_end)
 
     with connect(settings) as conn:
         with conn.cursor() as cur:
@@ -422,7 +506,7 @@ def main() -> None:
                     nearest_fire_km = float(r["nearest_fire_km"]) if r.get("nearest_fire_km") is not None else None
                     aq_observation_count = int(r.get("aq_observation_count") or 0)
                     newest_aq = r.get("newest_aq_observed_at")
-                else:
+                elif model_version == "v3":
                     fire_inside = int(r["fire_inside_count"] or 0)
                     nearby_fire_count = int(r["nearby_fire_count"] or 0)
                     max_frp = float(r["max_frp"]) if r.get("max_frp") is not None else None
@@ -440,7 +524,36 @@ def main() -> None:
                         window_end=window_end,
                         max_plume_exposure_score=max_plume,
                         plume_detection_count=det_plume,
-                        wind_model_version=WIND_PLUME_MODEL_VERSION,
+                        wind_model_version="wind_v1",
+                    )
+                    fire_count = fire_inside
+                    nearest_fire_km = float(r["nearest_fire_km"]) if r.get("nearest_fire_km") is not None else None
+                    aq_observation_count = int(r.get("aq_observation_count") or 0)
+                    newest_aq = r.get("newest_aq_observed_at")
+                else:
+                    fire_inside = int(r["fire_inside_count"] or 0)
+                    nearby_fire_count = int(r["nearby_fire_count"] or 0)
+                    max_frp = float(r["max_frp"]) if r.get("max_frp") is not None else None
+                    avg_pm25 = float(r["avg_pm25"]) if r.get("avg_pm25") is not None else None
+                    avg_pm10 = float(r["avg_pm10"]) if r.get("avg_pm10") is not None else None
+                    newest_fire = r.get("newest_fire_observed_at")
+                    max_plume, det_plume = plume_by_geo_v4.get((geo_type, geoid), (0.0, 0))
+                    plume_fb = plume_fallback_v4.get((geo_type, geoid), False)
+                    avg_rh, ngrid = grid_stats.get((geo_type, geoid), (None, 0))
+                    risk_score, risk_band_val, explanation = compute_risk_score_v4_fields(
+                        fire_inside_count=fire_inside,
+                        nearby_fire_count=nearby_fire_count,
+                        max_frp=max_frp,
+                        avg_pm25=avg_pm25,
+                        avg_pm10=avg_pm10,
+                        newest_fire_observed_at=newest_fire,
+                        window_end=window_end,
+                        max_plume_exposure_score=max_plume,
+                        plume_detection_count=det_plume,
+                        plume_model_version=settings.plume_model_version,
+                        avg_relative_humidity_percent=avg_rh,
+                        grid_weather_observation_count=ngrid,
+                        plume_fallback_used=plume_fb,
                     )
                     fire_count = fire_inside
                     nearest_fire_km = float(r["nearest_fire_km"]) if r.get("nearest_fire_km") is not None else None
