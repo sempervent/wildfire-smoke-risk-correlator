@@ -33,13 +33,16 @@ def monitored_topics() -> list[str]:
             t["firms_raw_topic"],
             t["openaq_raw_topic"],
             t["wind_raw_topic"],
+            t["grid_weather_raw_topic"],
             t["firms_dlq_topic"],
             t["openaq_dlq_topic"],
             t["wind_dlq_topic"],
+            t["grid_weather_dlq_topic"],
             t["normalization_errors_topic"],
             t["fire_normalized_topic"],
             t["air_quality_normalized_topic"],
             t["wind_normalized_topic"],
+            t["grid_weather_normalized_topic"],
             t["smoke_risk_topic"],
         }
     )

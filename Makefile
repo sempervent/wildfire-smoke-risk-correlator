@@ -1,6 +1,6 @@
 COMPOSE ?= docker compose
 
-.PHONY: up down reset db-bootstrap topics ingest-once ingest-live-once normalize normalize-wind compute-plume smoke-transport-demo smoke-test dlq-smoke-test test deps quality-check replay-fixtures replay-wind-fixtures replay-bad-fixtures replay-dlq parse-errors parse-errors-compact consumer-offsets collect-lag kafka-lag grafana-up refresh-mviews alerts-check alerts-materialize alerts-send alerts-send-digest alerts-send-retry operational-cycle operational-scheduler-up demo
+.PHONY: up down reset db-bootstrap topics ingest-once ingest-live-once normalize normalize-wind normalize-grid-weather match-fire-weather compute-plume smoke-transport-demo smoke-test dlq-smoke-test grid-weather-demo grid-weather-smoke-test test deps quality-check replay-fixtures replay-grid-weather-fixtures replay-wind-fixtures replay-bad-fixtures replay-dlq parse-errors parse-errors-compact consumer-offsets collect-lag kafka-lag grafana-up refresh-mviews alerts-check alerts-materialize alerts-send alerts-send-digest alerts-send-retry operational-cycle operational-scheduler-up demo
 
 deps:
 	uv sync --extra dev
@@ -33,6 +33,21 @@ normalize:
 
 normalize-wind:
 	bash scripts/run_normalize_wind.sh
+
+normalize-grid-weather:
+	bash scripts/run_normalize_grid_weather.sh
+
+match-fire-weather:
+	bash scripts/run_match_fire_weather.sh
+
+replay-grid-weather-fixtures:
+	bash scripts/replay_grid_weather_fixtures.sh
+
+grid-weather-demo:
+	bash scripts/grid_weather_demo.sh
+
+grid-weather-smoke-test:
+	GRID_WEATHER_SMOKE=1 bash scripts/smoke_test.sh
 
 compute-plume:
 	bash scripts/run_compute_plume.sh
