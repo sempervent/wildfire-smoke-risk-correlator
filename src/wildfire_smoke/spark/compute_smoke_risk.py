@@ -15,6 +15,7 @@ from wildfire_smoke.risk import (
     compute_risk_score_v2_fields,
     compute_risk_score_v3_fields,
     compute_risk_score_v4_fields,
+    compute_risk_score_v5_fields,
 )
 from wildfire_smoke.settings import Settings, kafka_topics
 
@@ -249,6 +250,28 @@ def _v2_sql_params(window_start: datetime, window_end: datetime, radius_m: float
     )
 
 
+def _dispersion_max_by_geography(
+    conn, window_start: datetime, window_end: datetime, dispersion_model_version: str
+) -> dict[tuple[str, str], tuple[float, int]]:
+    with conn.cursor(row_factory=dict_row) as cur:
+        cur.execute(
+            """
+            SELECT geography_type, geoid,
+                   COALESCE(MAX(dispersion_score), 0)::double precision AS max_dispersion,
+                   COUNT(DISTINCT detection_id)::int AS det_count
+            FROM analytics.smoke_dispersion_exposures
+            WHERE window_start = %s AND window_end = %s AND model_version = %s
+            GROUP BY geography_type, geoid
+            """,
+            (window_start, window_end, dispersion_model_version),
+        )
+        rows = cur.fetchall()
+    out: dict[tuple[str, str], tuple[float, int]] = {}
+    for r in rows:
+        out[(str(r["geography_type"]), str(r["geoid"]))] = (float(r["max_dispersion"]), int(r["det_count"]))
+    return out
+
+
 def _plume_max_by_geography_model(
     conn, window_start: datetime, window_end: datetime, plume_model_version: str
 ) -> dict[tuple[str, str], tuple[float, int]]:
@@ -420,7 +443,7 @@ def main() -> None:
                     cur.execute(TRACT_V1_SQL, (window_start, window_end, window_start, window_end))
                     for r in cur.fetchall():
                         rows_out.append({**dict(r), "geography_type": "tract"})
-            elif model_version in {"v2", "v3", "v4"}:
+            elif model_version in {"v2", "v3", "v4", "v5"}:
                 params = _v2_sql_params(window_start, window_end, radius_m)
                 if geographies in {"county", "both"}:
                     cur.execute(COUNTY_V2_SQL, params)
@@ -449,6 +472,7 @@ def main() -> None:
     plume_by_geo_v4: dict[tuple[str, str], tuple[float, int]] = {}
     plume_fallback_v4: dict[tuple[str, str], bool] = {}
     grid_stats: dict[tuple[str, str], tuple[float | None, int]] = {}
+    dispersion_by_geo: dict[tuple[str, str], tuple[float, int]] = {}
     if model_version == "v3":
         with connect(settings) as conn:
             plume_by_geo = _plume_max_by_geography_model(conn, window_start, window_end, "wind_v1")
@@ -458,6 +482,15 @@ def main() -> None:
             station_plumes = _plume_max_by_geography_model(conn, window_start, window_end, "wind_v1")
             plume_by_geo_v4, plume_fallback_v4 = _v4_plume_selection(settings, grid_plumes, station_plumes)
             grid_stats = _grid_weather_stats_by_geography(conn, window_start, window_end)
+    elif model_version == "v5":
+        with connect(settings) as conn:
+            grid_plumes = _plume_max_by_geography_model(conn, window_start, window_end, "wind_grid_v2")
+            station_plumes = _plume_max_by_geography_model(conn, window_start, window_end, "wind_v1")
+            plume_by_geo_v4, plume_fallback_v4 = _v4_plume_selection(settings, grid_plumes, station_plumes)
+            grid_stats = _grid_weather_stats_by_geography(conn, window_start, window_end)
+            dispersion_by_geo = _dispersion_max_by_geography(
+                conn, window_start, window_end, settings.dispersion_model_version
+            )
 
     with connect(settings) as conn:
         with conn.cursor() as cur:
@@ -530,7 +563,7 @@ def main() -> None:
                     nearest_fire_km = float(r["nearest_fire_km"]) if r.get("nearest_fire_km") is not None else None
                     aq_observation_count = int(r.get("aq_observation_count") or 0)
                     newest_aq = r.get("newest_aq_observed_at")
-                else:
+                elif model_version == "v4":
                     fire_inside = int(r["fire_inside_count"] or 0)
                     nearby_fire_count = int(r["nearby_fire_count"] or 0)
                     max_frp = float(r["max_frp"]) if r.get("max_frp") is not None else None
@@ -559,6 +592,41 @@ def main() -> None:
                     nearest_fire_km = float(r["nearest_fire_km"]) if r.get("nearest_fire_km") is not None else None
                     aq_observation_count = int(r.get("aq_observation_count") or 0)
                     newest_aq = r.get("newest_aq_observed_at")
+                elif model_version == "v5":
+                    fire_inside = int(r["fire_inside_count"] or 0)
+                    nearby_fire_count = int(r["nearby_fire_count"] or 0)
+                    max_frp = float(r["max_frp"]) if r.get("max_frp") is not None else None
+                    avg_pm25 = float(r["avg_pm25"]) if r.get("avg_pm25") is not None else None
+                    avg_pm10 = float(r["avg_pm10"]) if r.get("avg_pm10") is not None else None
+                    newest_fire = r.get("newest_fire_observed_at")
+                    max_plume, det_plume = plume_by_geo_v4.get((geo_type, geoid), (0.0, 0))
+                    plume_fb = plume_fallback_v4.get((geo_type, geoid), False)
+                    avg_rh, ngrid = grid_stats.get((geo_type, geoid), (None, 0))
+                    max_disp, disp_det = dispersion_by_geo.get((geo_type, geoid), (0.0, 0))
+                    risk_score, risk_band_val, explanation = compute_risk_score_v5_fields(
+                        fire_inside_count=fire_inside,
+                        nearby_fire_count=nearby_fire_count,
+                        max_frp=max_frp,
+                        avg_pm25=avg_pm25,
+                        avg_pm10=avg_pm10,
+                        newest_fire_observed_at=newest_fire,
+                        window_end=window_end,
+                        max_plume_exposure_score=max_plume,
+                        plume_detection_count=det_plume,
+                        plume_model_version=settings.plume_model_version,
+                        max_dispersion_score=max_disp,
+                        dispersion_detection_count=disp_det,
+                        dispersion_model_version=settings.dispersion_model_version,
+                        avg_relative_humidity_percent=avg_rh,
+                        grid_weather_observation_count=ngrid,
+                        plume_fallback_used=plume_fb,
+                    )
+                    fire_count = fire_inside
+                    nearest_fire_km = float(r["nearest_fire_km"]) if r.get("nearest_fire_km") is not None else None
+                    aq_observation_count = int(r.get("aq_observation_count") or 0)
+                    newest_aq = r.get("newest_aq_observed_at")
+                else:
+                    raise ValueError(f"Unsupported model branch: {model_version!r}")
 
                 cur.execute(
                     UPSERT_SQL,
