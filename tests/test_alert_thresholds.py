@@ -20,6 +20,9 @@ def test_alert_threshold_defaults(monkeypatch) -> None:
     monkeypatch.delenv("ALERT_KAFKA_LAG_CRITICAL_MESSAGES", raising=False)
     monkeypatch.delenv("ALERT_DLQ_DEPTH_WARN_MESSAGES", raising=False)
     monkeypatch.delenv("ALERT_DLQ_DEPTH_CRITICAL_MESSAGES", raising=False)
+    monkeypatch.delenv("ALERT_GRID_WEATHER_STALE_HOURS", raising=False)
+    monkeypatch.delenv("ALERT_FIRE_WEATHER_UNMATCHED_WARN_COUNT", raising=False)
+    monkeypatch.delenv("ALERT_FIRE_WEATHER_UNMATCHED_CRITICAL_COUNT", raising=False)
 
     t = alert_thresholds_from_env()
     assert t.freshness_warn_hours == 6
@@ -30,6 +33,9 @@ def test_alert_threshold_defaults(monkeypatch) -> None:
     assert t.parse_errors_warn_count == 1
     assert t.parse_errors_critical_count == 25
     assert t.consumer_offset_stale_hours == 6
+    assert t.grid_weather_stale_hours == 6
+    assert t.fire_weather_unmatched_warn_count == 5
+    assert t.fire_weather_unmatched_critical_count == 25
 
 
 def test_alert_threshold_overrides(monkeypatch) -> None:
@@ -54,6 +60,16 @@ def test_alert_threshold_phase8_overrides(monkeypatch) -> None:
     assert t.kafka_lag_critical_messages == 500
     assert t.dlq_depth_warn_messages == 2
     assert t.dlq_depth_critical_messages == 80
+
+
+def test_alert_threshold_phase9_overrides(monkeypatch) -> None:
+    monkeypatch.setenv("ALERT_GRID_WEATHER_STALE_HOURS", "12")
+    monkeypatch.setenv("ALERT_FIRE_WEATHER_UNMATCHED_WARN_COUNT", "7")
+    monkeypatch.setenv("ALERT_FIRE_WEATHER_UNMATCHED_CRITICAL_COUNT", "40")
+    t = alert_thresholds_from_env()
+    assert t.grid_weather_stale_hours == 12
+    assert t.fire_weather_unmatched_warn_count == 7
+    assert t.fire_weather_unmatched_critical_count == 40
 
 
 def test_alert_threshold_parse_dlq_overrides(monkeypatch) -> None:

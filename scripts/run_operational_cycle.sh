@@ -54,6 +54,22 @@ step normalize start
 bash "${ROOT_DIR}/scripts/run_normalize.sh"
 step normalize ok
 
+GRID_WEATHER_ENABLED="${GRID_WEATHER_ENABLED:-0}"
+if [[ "${GRID_WEATHER_ENABLED}" == "1" ]]; then
+  echo "==> Gridded weather (fixtures + Spark normalize + fire match)"
+  step grid_weather_replay start
+  bash "${ROOT_DIR}/scripts/replay_grid_weather_fixtures.sh"
+  step grid_weather_replay ok
+  step normalize_grid_weather start
+  bash "${ROOT_DIR}/scripts/run_normalize_grid_weather.sh"
+  step normalize_grid_weather ok
+  step match_fire_weather start
+  bash "${ROOT_DIR}/scripts/run_match_fire_weather.sh"
+  step match_fire_weather ok
+  export PLUME_MODEL_VERSION="${PLUME_MODEL_VERSION:-wind_grid_v2}"
+  export RISK_MODEL_VERSION="${RISK_MODEL_VERSION:-v4}"
+fi
+
 echo "==> Compute plume exposures"
 step compute_plume start
 bash "${ROOT_DIR}/scripts/run_compute_plume.sh"

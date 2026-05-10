@@ -130,6 +130,22 @@ DRY_RUN=1 bash "${ROOT_DIR}/scripts/compact_parse_errors.sh" || true
 test -f "${ROOT_DIR}/docs/runbooks/kafka-lag-high.md"
 test -f "${ROOT_DIR}/docs/runbooks/dlq-depth-high.md"
 test -f "${ROOT_DIR}/docs/runbooks/replay-failures-recent.md"
+test -f "${ROOT_DIR}/docs/runbooks/grid-weather-stale.md"
+test -f "${ROOT_DIR}/docs/runbooks/no-recent-grid-weather.md"
+test -f "${ROOT_DIR}/docs/runbooks/fire-weather-unmatched-high.md"
+
+echo "==> Phase 9 gridded weather (tables / views / topics)"
+for t in weather.grid.raw weather.grid.dlq weather.grid.normalized; do
+  ${COMPOSE} exec -T redpanda rpk topic describe "${t}" --brokers 127.0.0.1:9092 >/dev/null
+done
+${COMPOSE} exec -T postgres psql -v ON_ERROR_STOP=1 -U "${POSTGRES_USER}" -d "${POSTGRES_DB}" -c "SELECT COUNT(*) FROM normalized.weather_grid_cells;"
+${COMPOSE} exec -T postgres psql -v ON_ERROR_STOP=1 -U "${POSTGRES_USER}" -d "${POSTGRES_DB}" -c "SELECT COUNT(*) FROM analytics.v_latest_weather_grid_cells;"
+${COMPOSE} exec -T postgres psql -v ON_ERROR_STOP=1 -U "${POSTGRES_USER}" -d "${POSTGRES_DB}" -c "SELECT COUNT(*) FROM analytics.v_grid_weather_operational_summary;"
+
+if [[ "${GRID_WEATHER_SMOKE:-0}" == "1" ]]; then
+  echo "==> GRID_WEATHER_SMOKE=1: grid-weather demo chain (Spark + plume v2 + risk v4)"
+  bash "${ROOT_DIR}/scripts/grid_weather_demo.sh"
+fi
 
 echo "==> Phase 4 alert persistence + routing (table + dry-run materialize + console send)"
 ${COMPOSE} exec -T postgres psql -v ON_ERROR_STOP=1 -U "${POSTGRES_USER}" -d "${POSTGRES_DB}" -c \

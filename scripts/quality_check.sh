@@ -120,6 +120,36 @@ for t in firms.hotspots.dlq openaq.measurements.dlq weather.wind.dlq normalizati
   fi
 done
 
+echo "==> Phase 9 Kafka topics (gridded weather)"
+for t in weather.grid.raw weather.grid.dlq weather.grid.normalized; do
+  if ! ${COMPOSE} exec -T redpanda rpk topic describe "${t}" --brokers 127.0.0.1:9092 >/dev/null 2>&1; then
+    fail "Missing Kafka topic ${t} (run make topics)."
+  fi
+done
+
+echo "==> Phase 9 gridded weather DDL / views compile"
+psql_exec -c "SELECT COUNT(*) FROM normalized.weather_grid_cells;"
+psql_exec -c "SELECT COUNT(*) FROM analytics.v_latest_weather_grid_cells;"
+psql_exec -c "SELECT COUNT(*) FROM analytics.v_fire_weather_matches;"
+psql_exec -c "SELECT COUNT(*) FROM analytics.v_grid_weather_operational_summary;"
+psql_exec -c "SELECT COUNT(*) FROM analytics.v_latest_smoke_plume_exposures_v2;"
+psql_exec -c "SELECT COUNT(*) FROM analytics.v_latest_smoke_risk_v4;"
+
+if [[ "${GRID_WEATHER_ENABLED:-0}" == "1" ]]; then
+  GRIDC="$(psql_exec -At -c "SELECT COUNT(*)::text FROM normalized.weather_grid_cells WHERE valid_time >= now() - interval '48 hours';")"
+  if [[ "${GRIDC}" == "0" ]]; then
+    warn "GRID_WEATHER_ENABLED=1 but no weather_grid_cells in the last 48h."
+  fi
+  FW_UN="$(psql_exec -At -c "
+    SELECT COUNT(*)::text FROM normalized.fire_detections f
+    WHERE f.acq_datetime >= now() - interval '24 hours'
+      AND NOT EXISTS (SELECT 1 FROM analytics.fire_weather_matches m WHERE m.detection_id = f.detection_id);
+  ")"
+  if [[ "${FW_UN}" =~ ^[0-9]+$ ]] && [[ "${FW_UN}" != "0" ]]; then
+    warn "Recent fire detections without fire_weather_matches: ${FW_UN}"
+  fi
+fi
+
 echo "==> Parse errors / consumer offset evidence (warnings)"
 OPEN_PE="$(psql_exec -At -c "SELECT COUNT(*)::text FROM analytics.parse_errors WHERE status = 'open';")"
 if [[ "${OPEN_PE}" != "0" ]]; then

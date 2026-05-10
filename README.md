@@ -16,6 +16,8 @@ This repository implements a **Kafka + Spark + PostGIS** pipeline that correlate
 
 **Phase 8** adds **bounded `WIND_BBOX` → NWS station discovery** (still overridden by **`WIND_STATION_IDS`**), **broker watermark + lag observations** (`analytics.kafka_topic_offsets`, `analytics.kafka_consumer_lag_observations`; distinct from Phase 7 application offsets), **`make collect-lag`** / **`make kafka-lag`**, **DLQ depth / pipeline lag SQL views**, **durable DLQ replay bookkeeping** (`analytics.dlq_replay_runs`, `analytics.dlq_replay_items`), **parse-error compaction / archival** (`make parse-errors-compact`, **`DRY_RUN=1` default**), **env-linked parser spike + lag + DLQ depth thresholds**, new alert candidates **`kafka_lag_high`**, **`dlq_depth_high`**, **`replay_failures_recent`**, **`COLLECT_LAG`** near the end of **`make operational-cycle`** (non-fatal unless **`STRICT_LAG_COLLECTION=1`**), and Grafana tables for lag / replay visibility.
 
+**Phase 9** adds **bounded gridded weather** (`weather.grid.raw|normalized|dlq`), **`raw.gridded_weather`** + **`normalized.weather_grid_cells`** + **`analytics.fire_weather_matches`**, Spark **`normalize_grid_weather`** / **`match_fire_weather`**, plume model **`wind_grid_v2`** (prefers matched grid wind; optional **`PLUME_GRID_FALLBACK_TO_STATION`**), risk model **`v4`** (v2 base + grid plume blend + humidity dampening — still **not** dispersion-grade), SQL presentation views, alerts (**`grid_weather_stale`**, **`no_recent_grid_weather`**, **`fire_weather_unmatched_high`**, **`grid_weather_parse_errors_high`**), Grafana tables, and **`make grid-weather-demo`** / **`GRID_WEATHER_SMOKE=1`** smoke hooks.
+
 Wind direction uses the **meteorological convention** (*wind FROM*); modeled smoke transport uses the **opposite bearing** (see `src/wildfire_smoke/wind.py`).
 
 **Important:** the risk score is a **demonstration / operations correlation index**, not a health advisory model.
@@ -26,8 +28,9 @@ Wind direction uses the **meteorological convention** (*wind FROM*); modeled smo
 - **Ingest** OpenAQ v3 measurements into Kafka (`openaq.measurements.raw`).
 - **Ingest** wind observations into Kafka (`weather.wind.raw`; fixtures via **`WIND_DRY_RUN=1`**, or bounded **NWS** adapter via **`WIND_STATION_IDS`** or **`WIND_BBOX`** station discovery with **`WIND_STATION_DISCOVERY_LIMIT`**).
 - **Normalize** Kafka messages into PostGIS tables (`normalized.*`) using Spark batch jobs, including **spatial association** to `geo.counties` / `geo.tracts`.
-- **Compute** configurable-window risk scores into `analytics.smoke_risk_scores` (models **v1**, **v2**, and optional **`v3`**) and publish JSON snapshots to Kafka (`smoke.risk.scores`).
-- **Compute** optional **`wind_v1` plume corridor exposures** (`make compute-plume`) for geography-linked smoke-transport visualization (engineering heuristic only).
+- **Optional grid weather:** bounded ingest to **`weather.grid.raw`** → **`normalized.weather_grid_cells`**, then **`analytics.fire_weather_matches`** links fires to nearest cells (`make match-fire-weather`).
+- **Compute** configurable-window risk scores into `analytics.smoke_risk_scores` (models **v1**, **v2**, **v3**, and optional **`v4`** when grid weather is enabled) and publish JSON snapshots to Kafka (`smoke.risk.scores`).
+- **Compute** optional **plume corridor exposures** (`make compute-plume`): **`wind_v1`** (station wind) or **`wind_grid_v2`** (matched grid wind; engineering heuristic only).
 - **Bootstrap** county + tract boundaries from Census TIGER/Line (default **Tennessee**; optional **multi-state** or **national county** load via env — see below).
 
 ## Architecture
@@ -52,9 +55,19 @@ flowchart LR
   NW --> PW[normalized.wind_observations]
   NW --> KW2[weather.wind.normalized]
 
+  GWX[Grid weather fixture / NWS gridpoint] --> GP[Grid weather producer]
+  GP --> KWG[weather.grid.raw]
+  KWG --> NG[Spark normalize_grid_weather]
+  NG --> WGC[normalized.weather_grid_cells]
+  NG --> KGN[weather.grid.normalized]
+  PF --> MW[match_fire_weather]
+  WGC --> MW
+  MW --> FWM[analytics.fire_weather_matches]
+
   CEN[Census TIGER/Line] --> PG[(PostGIS geo schema)]
   PF --> PL[Plume job compute_plume_exposure]
   PW --> PL
+  FWM --> PL
   PF --> SR[Risk job compute_smoke_risk]
   PA --> SR
   PG --> SR
@@ -143,7 +156,7 @@ make normalize
 
 Runs the Python risk job in the Spark container (defaults: **v2** model, **24h** lookback, **50 km** nearby-fire radius, **both** county and tract). Override via environment (also respected when exported before `make compute-risk`):
 
-- `SMOKE_RISK_MODEL_VERSION` — `v1` or `v2` (default `v2`)
+- `SMOKE_RISK_MODEL_VERSION` / `RISK_MODEL_VERSION` — `v1`, `v2`, `v3`, or `v4` (default `v2`; **`v4`** expects grid plume inputs when enabled)
 - `SMOKE_RISK_LOOKBACK_HOURS` — default `24`
 - `SMOKE_RISK_NEARBY_KM` — default `50`
 - `SMOKE_RISK_GEOGRAPHIES` — `county`, `tract`, or `both`
@@ -186,9 +199,9 @@ make grafana-up
 ### Alerting / SLIs (SQL-first)
 
 - **Views:** `analytics.v_sli_*` surface ingestion failures, freshness ages, sparse recent rows, and high-risk rows.
-- **Candidates:** `analytics.fn_alert_candidates(...)` unions actionable rows with **14** threshold parameters (freshness, risk/plume, parse-error counts, consumer-offset stale hours, parser spike counts, Kafka lag message floors, DLQ depth proxy floors — see `scripts/check_alerts.sh` / `wildfire_smoke.alert_thresholds`). `analytics.v_alert_candidates` applies SQL defaults on the function (CLI passes env-derived values).
+- **Candidates:** `analytics.fn_alert_candidates(...)` unions actionable rows with **17** threshold parameters (freshness, risk/plume, parse-error counts, consumer-offset stale hours, parser spike counts, Kafka lag message floors, DLQ depth proxy floors, grid-weather staleness hours, fire–weather unmatched warn/critical counts — see `scripts/check_alerts.sh` / `wildfire_smoke.alert_thresholds`). `analytics.v_alert_candidates` applies SQL defaults on the function (CLI passes env-derived values).
 - **CLI:** `make alerts-check` prints candidates and exits **2** if any **`severity = critical`** exists. Set **`ALERTS_WARN_ONLY=1`** to always exit 0 (recommended for fixture demos where timestamps are intentionally stale).
-- **Threshold env:** `ALERT_FRESHNESS_WARN_HOURS` (default 6), `ALERT_FRESHNESS_CRITICAL_HOURS` (24), `ALERT_HIGH_RISK_MIN_SCORE` (75), `ALERT_LOOKBACK_HOURS` (24), `ALERT_HIGH_PLUME_EXPOSURE_MIN_SCORE` (70), `ALERT_PARSE_ERRORS_WARN_COUNT` (1), `ALERT_PARSE_ERRORS_CRITICAL_COUNT` (25), `ALERT_CONSUMER_OFFSET_STALE_HOURS` (6), `ALERT_PARSER_SPIKE_WARN_COUNT` (15), `ALERT_PARSER_SPIKE_CRITICAL_COUNT` (40), `ALERT_KAFKA_LAG_WARN_MESSAGES` (100), `ALERT_KAFKA_LAG_CRITICAL_MESSAGES` (1000), `ALERT_DLQ_DEPTH_WARN_MESSAGES` (1), `ALERT_DLQ_DEPTH_CRITICAL_MESSAGES` (100).
+- **Threshold env:** `ALERT_FRESHNESS_WARN_HOURS` (default 6), `ALERT_FRESHNESS_CRITICAL_HOURS` (24), `ALERT_HIGH_RISK_MIN_SCORE` (75), `ALERT_LOOKBACK_HOURS` (24), `ALERT_HIGH_PLUME_EXPOSURE_MIN_SCORE` (70), `ALERT_PARSE_ERRORS_WARN_COUNT` (1), `ALERT_PARSE_ERRORS_CRITICAL_COUNT` (25), `ALERT_CONSUMER_OFFSET_STALE_HOURS` (6), `ALERT_PARSER_SPIKE_WARN_COUNT` (15), `ALERT_PARSER_SPIKE_CRITICAL_COUNT` (40), `ALERT_KAFKA_LAG_WARN_MESSAGES` (100), `ALERT_KAFKA_LAG_CRITICAL_MESSAGES` (1000), `ALERT_DLQ_DEPTH_WARN_MESSAGES` (1), `ALERT_DLQ_DEPTH_CRITICAL_MESSAGES` (100), `ALERT_GRID_WEATHER_STALE_HOURS` (6), `ALERT_FIRE_WEATHER_UNMATCHED_WARN_COUNT` (5), `ALERT_FIRE_WEATHER_UNMATCHED_CRITICAL_COUNT` (25).
 
 ### Phase 4 — persisted alerts, notifications, bounded live ingest
 
@@ -246,6 +259,8 @@ make operational-cycle LIVE_MODE=1
 Phase 5 records each fixture/live cycle into **`analytics.operational_runs`** with JSON **`steps`** (names/status/timestamps only—no secrets).
 
 Phase 8 appends a **`collect_lag`** step when **`COLLECT_LAG=1`** (default **1**): `scripts/collect_kafka_lag.sh` snapshots broker highs and approximate lag vs application offsets. Failures are **`warn`** unless **`STRICT_LAG_COLLECTION=1`**. Alerts are materialized **after** lag collection so **`kafka_lag_high`** / **`dlq_depth_high`** candidates can appear in the same cycle.
+
+When **`GRID_WEATHER_ENABLED=1`**, Phase 9 hooks **`make operational-cycle`** to replay grid fixtures (fixture mode), run **`normalize-grid-weather`** + **`match-fire-weather`**, and default **`PLUME_MODEL_VERSION=wind_grid_v2`** / **`RISK_MODEL_VERSION=v4`** for downstream jobs unless overridden.
 
 ### Phase 5 — notification reliability, digest, scheduling
 
@@ -380,6 +395,42 @@ This wipes the Postgres volume, recreates topics, re-downloads Census data for t
 
 - **`DLQ_REPLAY_BOOKKEEPING=1`** (default): each **`replay-dlq`** run inserts **`analytics.dlq_replay_runs`** + per-row **`analytics.dlq_replay_items`** (`planned` / `skipped` / `replayed` / `failed`). **`DLQ_RESOLVE_ON_REPLAY=1`** increments **`records_resolved`** when Postgres rows move to **`resolved`**.
 
+## Phase 9 — gridded weather, fire matching, plume v2, risk v4
+
+**Fixture mode (no secrets)**
+
+- Defaults: **`GRID_WEATHER_ENABLED=0`**, **`GRID_WEATHER_DRY_RUN=1`**, **`GRID_WEATHER_FIXTURE_JSON=tests/fixtures/nws_gridpoint_sample.json`**.
+- **`make replay-grid-weather-fixtures`** publishes to **`weather.grid.raw`** (optional inclusion in **`make replay-fixtures`** via **`GRID_WEATHER_REPLAY_WITH_FIXTURES=1`**).
+
+**Live mode (bounded)**
+
+- Reuses **`LIVE_INGEST_MAX_SPAN_DEG`** / **`LIVE_INGEST_ALLOW_LARGE_BBOX`** (same semantics as FIRMS/OpenAQ/WIND bbox guards).
+- **`GRID_WEATHER_REFUSE_LARGE_BBOX=1`** rejects oversized **`GRID_WEATHER_BBOX`** unless **`LIVE_INGEST_ALLOW_LARGE_BBOX=1`**.
+- Live pulls require a descriptive **`NWS_USER_AGENT`** (repo default logs a warning).
+
+**Pipeline**
+
+1. Producer → **`weather.grid.raw`** (+ optional **`raw.gridded_weather`** rows mirroring other producers).
+2. **`make normalize-grid-weather`** → **`normalized.weather_grid_cells`** + **`weather.grid.normalized`** / DLQ on malformed rows.
+3. **`make match-fire-weather`** → **`analytics.fire_weather_matches`** (`FIRE_WEATHER_MATCH_RADIUS_KM`, **`FIRE_WEATHER_MATCH_MAX_TIME_DELTA_HOURS`**).
+4. **`make compute-plume`** with **`PLUME_MODEL_VERSION=wind_grid_v2`** (optional **`PLUME_GRID_FALLBACK_TO_STATION=1`**).
+5. **`make compute-risk`** with **`RISK_MODEL_VERSION=v4`** (alias **`SMOKE_RISK_MODEL_VERSION`**).
+
+**Demos**
+
+- **`make grid-weather-demo`**: fixture replay → normalize → match → plume v2 → risk v4 + summary SQL.
+- **`make grid-weather-smoke-test`**: sets **`GRID_WEATHER_SMOKE=1`** for an extended smoke path.
+
+**Ops / alerts**
+
+- Runbooks: `docs/runbooks/grid-weather-stale.md`, `no-recent-grid-weather.md`, `fire-weather-unmatched-high.md`; **`grid_weather_parse_errors_high`** maps to the shared parse-errors runbook.
+- Grafana: tables for latest grid cells, matches, match summary, operational summary, risk v4, plume **`wind_grid_v2`**.
+
+**Known limitations**
+
+- Live NWS grid coverage is **not** a full mesonet; defaults stay **small bbox** / **`GRID_WEATHER_MAX_POINTS`** caps.
+- **`analytics.v_dlq_topic_depth`** remains a coarse proxy on dev volumes with retained DLQ traffic.
+
 ## Makefile targets
 
 | Target          | Purpose                                              |
@@ -393,7 +444,12 @@ This wipes the Postgres volume, recreates topics, re-downloads Census data for t
 | `make ingest-once`  | Run FIRMS + OpenAQ + wind producers once           |
 | `make normalize`    | Run Spark normalization jobs (FIRMS + OpenAQ + wind) |
 | `make normalize-wind` | Spark-normalize **`weather.wind.raw`** only       |
-| `make compute-plume` | **`wind_v1` corridor exposures** (PostGIS job)    |
+| `make normalize-grid-weather` | Spark-normalize **`weather.grid.raw`** → **`normalized.weather_grid_cells`** |
+| `make match-fire-weather` | Match recent fires to nearest grid cells (`analytics.fire_weather_matches`) |
+| `make replay-grid-weather-fixtures` | Publish grid weather fixture to **`weather.grid.raw`** |
+| `make grid-weather-demo` | End-to-end grid fixture → normalize → match → plume v2 → risk v4 |
+| `make grid-weather-smoke-test` | **`GRID_WEATHER_SMOKE=1`** smoke wrapper |
+| `make compute-plume` | **`wind_v1`** / **`wind_grid_v2`** corridor exposures (PostGIS job)    |
 | `make compute-risk`   | Run Python smoke-risk job (in Spark container)   |
 | `make replay-fixtures`| Fixture Kafka publish + normalize + plume + risk |
 | `make replay-wind-fixtures` | Publish **`WIND_DRY_RUN`** wind fixture + normalize-wind |
@@ -417,7 +473,7 @@ This wipes the Postgres volume, recreates topics, re-downloads Census data for t
 | `make operational-cycle` | Fixture replay **or** live ingest + batch jobs |
 | `make operational-scheduler-up` | Start Compose **`scheduler`** profile loop |
 | `make demo`           | No-secrets local demo (`replay-fixtures` path)   |
-| `make smoke-test`   | Run `scripts/smoke_test.sh`                      |
+| `make smoke-test`   | Run `scripts/smoke_test.sh` (optional **`GRID_WEATHER_SMOKE=1`**)                      |
 | `make test`     | Run pytest                                           |
 
 ## Inspecting Kafka topics
@@ -452,6 +508,7 @@ Stable analytics views for dashboards include:
 - **Phase 6 transport:** `analytics.v_latest_wind_observations`, `analytics.v_latest_wind_observations_geojson`, `analytics.v_latest_smoke_plume_exposures`, `analytics.v_top_plume_exposures`, `analytics.v_latest_smoke_risk_v3`, `analytics.v_smoke_transport_summary`
 - **Phase 7 DLQ / offsets:** `analytics.v_parse_errors_open`, `analytics.v_parse_error_summary`, `analytics.v_parse_errors_recent`, `analytics.v_consumer_offset_state`, `analytics.v_dlq_operational_summary`
 - **Phase 8 lag / replay:** `analytics.v_kafka_topic_depth`, `analytics.v_consumer_lag_latest`, `analytics.v_dlq_topic_depth`, `analytics.v_pipeline_lag_summary`, `analytics.v_dlq_replay_runs`, `analytics.v_dlq_replay_items_recent`
+- **Phase 9 grid weather:** `analytics.v_latest_weather_grid_cells`, `analytics.v_latest_weather_grid_cells_geojson`, `analytics.v_fire_weather_matches`, `analytics.v_fire_weather_match_summary`, `analytics.v_latest_smoke_plume_exposures_v2`, `analytics.v_latest_smoke_risk_v4`, `analytics.v_grid_weather_operational_summary`
 - **Phase 3 SLIs / alerts:** `analytics.v_sli_*`, `analytics.v_alert_candidates`, `analytics.fn_alert_candidates(...)`
 
 Producer runs append rows to **`analytics.ingestion_runs`** (`run_id`, `source`, `mode` `live|dry_run`, counts, `config` JSON without secrets, `error_message` on failure).
@@ -508,6 +565,25 @@ risk\_{score} = \min\left(100,\ 0.75\, base\_{v2} + 25\, plume\_{component}\righ
 
 Run **`SMOKE_RISK_MODEL_VERSION=v1`** or **`=v3`** to compare models on the same clock-aligned window (compute **`make compute-plume`** first so v3’s plume signal is populated when fires/wind align).
 
+### Model v4 (grid-informed plume + humidity dampening)
+
+Uses the **same v2 spatial/AQ base** as v3’s foundation, selects **max grid plume exposure** when **`wind_grid_v2`** rows exist (with optional fallback behavior tied to **`PLUME_GRID_FALLBACK_TO_STATION`**), applies **humidity dampening** on relative humidity from matched grid weather, and caps the blended score:
+
+\[
+humidity\_{dampening} =
+\begin{cases}
+1.0 & \text{if } RH \text{ is null} \\
+1.0 - \min\left(0.25,\frac{\max(RH-40,0)}{200}\right) & \text{otherwise}
+\end{cases}
+\]
+
+\[
+plume\_{component} = \min\left(1,\frac{max\_{grid\ plume}}{100}\right),\quad
+risk\_{score} = \min\left(100,\ 0.70\, base\_{v2} + 30\, plume\_{component}\cdot humidity\_{dampening}\right)
+\]
+
+This remains an **engineering correlation** experiment — **not** dispersion modeling or health guidance.
+
 ## Troubleshooting
 
 - **Spark normalization / JDBC**: executor containers need **`PSYCOPG_CONNINFO`** (or JDBC URL + credentials) and **`KAFKA_BOOTSTRAP_SERVERS`**—see `scripts/run_normalize.sh`. The smoke-risk job uses the same Spark image but runs **`python3`** with psycopg only (`scripts/run_compute_risk.sh`).
@@ -529,6 +605,7 @@ Run **`SMOKE_RISK_MODEL_VERSION=v1`** or **`=v3`** to compare models on the same
 - **Spark jobs are batch** (`earliest` → `latest` offsets per run), not a continuously committed streaming deployment.
 - **Risk inputs** require sufficient recent normalized rows; the smoke test explicitly validates the risk job **runs even when the window is empty**.
 - **`make operational-cycle`**: runs Spark normalization + risk jobs — expect **minutes** locally; `scripts/smoke_test.sh` sanity-checks the shell entrypoints via `bash -n` while pytest covers notifier/bbox helpers without rerunning the full Compose loop every time.
+- **Grid weather:** v4 / **`wind_grid_v2`** depend on populated **`weather_grid_cells`** and **`fire_weather_matches`**; empty fixture windows can yield zero plume rows — widen lookback or replay fixtures as needed.
 - **Notifier secrets**: never log `SMTP_PASSWORD`, webhook URLs, or API keys — failures must redact URLs to host-only where practical.
 
 ## Next steps

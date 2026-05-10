@@ -8,9 +8,9 @@ This repository is a **local-first vertical slice** for correlating NASA FIRMS h
 - **Dry-run vs live:** `FIRMS_DRY_RUN=1` / `OPENAQ_DRY_RUN=1` force fixture publishing only—no NASA/OpenAQ network calls. Live ingestion requires keys and fails fast when prerequisites are missing.
 - **No-secret logging:** ingestion run **`config` JSONB** must never contain API keys or map keys; producers only record safe operational fields (bbox, sources, fixture paths, YAML limits).
 - **Additive migrations:** ship DDL under `sql/migrations/*.sql`; `scripts/bootstrap_db.sh` applies them before views. Keep `docker/postgres/initdb/` in sync for fresh volumes.
-- **Risk disclaimer:** scores are an **engineering correlation index**, not a public-health advisory—for **v1**, **v2**, and **v3**.
+- **Risk disclaimer:** scores are an **engineering correlation index**, not a public-health advisory—for **v1**, **v2**, **v3**, and **v4**.
 - **Meteorological wind convention:** treat **`wind_direction_degrees` as wind FROM** (origin bearing). Modeled smoke transport uses the **downwind / opposite bearing**—preserve this invariant in math and docs (`src/wildfire_smoke/wind.py`).
-- **Plume model honesty:** `wind_v1` / `analytics.smoke_plume_exposures` is a **simple corridor heuristic**, not atmospheric dispersion, CFD, or epidemiology—never imply clinical/air-quality advisory accuracy from these scores alone.
+- **Plume model honesty:** `wind_v1` / `wind_grid_v2` / `analytics.smoke_plume_exposures` are **simple corridor heuristics**, not atmospheric dispersion, CFD, or epidemiology—never imply clinical/air-quality advisory accuracy from these scores alone. **`wind_grid_v2`** does **not** make the model dispersion-grade.
 - **Wind fixtures stay no-secrets:** `WIND_DRY_RUN=1` + checked-in JSONL must remain runnable without API keys; live wind pulls stay **bounded** (`WIND_STATION_IDS` **or** `WIND_BBOX` discovery with **`WIND_STATION_DISCOVERY_LIMIT`**, optional radius buffer—never “fetch all CONUS stations” defaults).
 - **Network notifier tests:** mock HTTP/SMTP transports—do not rely on live external calls in unit tests.
 - **Dashboard GeoJSON views are presentation-only.** Canonical geometries live in **`geo.counties` / `geo.tracts`** (and point rows in **`normalized.*`**). Do not treat `analytics.v_latest_*_geojson` as authoritative storage.
@@ -31,6 +31,7 @@ This repository is a **local-first vertical slice** for correlating NASA FIRMS h
 - **Lag collection resilience:** `collect_kafka_lag` / operational **`collect_lag`** steps must **not** fail scheduled cycles by default; operators opt into hard failure via **`STRICT_LAG_COLLECTION=1`**.
 - **Replay bookkeeping:** `replay-dlq` defaults to **`DRY_RUN=1`**; **`DLQ_REPLAY_BOOKKEEPING`** defaults on — preserve audit rows instead of deleting parse-error history.
 - **Parse errors lifecycle:** **`parse-errors-compact`** defaults to **report-only** (`DRY_RUN=1`); avoid deleting **`parse_errors`** rows — archival to **`archived`** is explicit opt-in.
+- **Phase 9 gridded weather:** live ingest stays **bounded** (`GRID_WEATHER_BBOX` span guards mirror **`LIVE_INGEST_*`**; **`GRID_WEATHER_REFUSE_LARGE_BBOX`** defaults on). **`GRID_WEATHER_DRY_RUN=1`** + checked-in fixtures must remain **no-secrets**. Malformed grid payloads belong in **`analytics.parse_errors`** and **`weather.grid.dlq`** like other normalizers—never silently drop accountability.
 
 ## Operating constraints
 
