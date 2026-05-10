@@ -28,6 +28,11 @@ py_mod wildfire_smoke.producers.firms_producer
 py_mod wildfire_smoke.producers.openaq_producer
 py_mod wildfire_smoke.producers.wind_producer
 
+if [[ "${GRID_WEATHER_REPLAY_WITH_FIXTURES:-0}" == "1" ]]; then
+  echo "==> Optional grid weather fixture replay (GRID_WEATHER_REPLAY_WITH_FIXTURES=1)"
+  bash "${ROOT_DIR}/scripts/replay_grid_weather_fixtures.sh"
+fi
+
 if [[ "${REPLAY_RUN_NORMALIZE}" == "1" ]]; then
   echo "==> Normalizing Kafka streams -> PostGIS (Spark)"
   bash "${ROOT_DIR}/scripts/run_normalize.sh"

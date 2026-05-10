@@ -52,6 +52,24 @@ class Settings:
     plume_max_distance_km: float
     plume_half_angle_degrees: float
 
+    grid_weather_enabled: bool
+    grid_weather_source: str
+    grid_weather_dry_run: bool
+    grid_weather_fixture_json: Path
+    grid_weather_bbox: str | None
+    grid_weather_max_points: int
+    grid_weather_lookahead_hours: int
+    grid_weather_variables: tuple[str, ...]
+    grid_weather_cell_size_degrees: float
+    grid_weather_refuse_large_bbox: bool
+
+    fire_weather_match_radius_km: float
+    fire_weather_match_max_time_delta_hours: float
+    fire_weather_match_method: str
+
+    plume_model_version: str
+    plume_grid_fallback_to_station: bool
+
     jdbc_url: str
 
     smoke_risk_model_version: str
@@ -100,14 +118,60 @@ class Settings:
         plume_max_distance_km = float(os.environ.get("PLUME_MAX_DISTANCE_KM", "150"))
         plume_half_angle_degrees = float(os.environ.get("PLUME_HALF_ANGLE_DEGREES", "30"))
 
+        gw_yaml = load_yaml_config("sources.yaml").get("grid_weather") or {}
+        grid_weather_enabled = os.environ.get("GRID_WEATHER_ENABLED", "0").strip().lower() in {"1", "true", "yes"}
+        grid_weather_source = os.environ.get("GRID_WEATHER_SOURCE", "nws_gridpoint").strip()
+        grid_weather_dry_run = os.environ.get("GRID_WEATHER_DRY_RUN", "1").strip().lower() in {"1", "true", "yes"}
+        grid_weather_fixture_json = Path(
+            os.environ.get("GRID_WEATHER_FIXTURE_JSON", "tests/fixtures/nws_gridpoint_sample.json")
+        )
+        grid_bbox_env = os.environ.get("GRID_WEATHER_BBOX", "").strip()
+        grid_weather_bbox = grid_bbox_env or str(gw_yaml.get("bbox_default") or "").strip() or None
+        grid_weather_max_points = int(os.environ.get("GRID_WEATHER_MAX_POINTS", str(gw_yaml.get("max_points_default") or 100)))
+        if grid_weather_max_points < 1:
+            raise ValueError("GRID_WEATHER_MAX_POINTS must be >= 1")
+        grid_weather_lookahead_hours = int(
+            os.environ.get("GRID_WEATHER_LOOKAHEAD_HOURS", str(gw_yaml.get("lookahead_hours_default") or 24))
+        )
+        gv_raw = os.environ.get("GRID_WEATHER_VARIABLES", "windSpeed,windDirection,temperature,relativeHumidity")
+        grid_weather_variables = tuple(s.strip() for s in gv_raw.split(",") if s.strip())
+        grid_weather_cell_size_degrees = float(
+            os.environ.get(
+                "GRID_WEATHER_CELL_SIZE_DEGREES",
+                str(gw_yaml.get("cell_size_degrees_default") or 0.05),
+            )
+        )
+        if grid_weather_cell_size_degrees <= 0:
+            raise ValueError("GRID_WEATHER_CELL_SIZE_DEGREES must be > 0")
+        grid_weather_refuse_large_bbox = os.environ.get("GRID_WEATHER_REFUSE_LARGE_BBOX", "1").strip().lower() in {
+            "1",
+            "true",
+            "yes",
+        }
+
+        fire_weather_match_radius_km = float(os.environ.get("FIRE_WEATHER_MATCH_RADIUS_KM", "50"))
+        fire_weather_match_max_time_delta_hours = float(os.environ.get("FIRE_WEATHER_MATCH_MAX_TIME_DELTA_HOURS", "3"))
+        fire_weather_match_method = os.environ.get("FIRE_WEATHER_MATCH_METHOD", "nearest_grid_cell").strip()
+
+        plume_model_version = os.environ.get("PLUME_MODEL_VERSION", "wind_v1").strip().lower()
+        if plume_model_version not in {"wind_v1", "wind_grid_v2"}:
+            raise ValueError("PLUME_MODEL_VERSION must be one of: wind_v1, wind_grid_v2")
+        plume_grid_fallback_to_station = os.environ.get("PLUME_GRID_FALLBACK_TO_STATION", "1").strip().lower() in {
+            "1",
+            "true",
+            "yes",
+        }
+
         jdbc_url = os.environ.get(
             "JDBC_URL",
             f"jdbc:postgresql://{postgres_host}:{postgres_port}/{postgres_db}",
         )
 
-        smoke_risk_model_version = os.environ.get("SMOKE_RISK_MODEL_VERSION", "v2").strip().lower()
-        if smoke_risk_model_version not in {"v1", "v2", "v3"}:
-            raise ValueError("SMOKE_RISK_MODEL_VERSION must be one of: v1, v2, v3")
+        smoke_risk_model_version = (
+            os.environ.get("RISK_MODEL_VERSION") or os.environ.get("SMOKE_RISK_MODEL_VERSION", "v2")
+        ).strip().lower()
+        if smoke_risk_model_version not in {"v1", "v2", "v3", "v4"}:
+            raise ValueError("SMOKE_RISK_MODEL_VERSION must be one of: v1, v2, v3, v4")
 
         smoke_risk_lookback_hours = int(os.environ.get("SMOKE_RISK_LOOKBACK_HOURS", "24"))
         if smoke_risk_lookback_hours < 1:
@@ -147,6 +211,21 @@ class Settings:
             wind_match_lookback_hours=wind_match_lookback_hours,
             plume_max_distance_km=plume_max_distance_km,
             plume_half_angle_degrees=plume_half_angle_degrees,
+            grid_weather_enabled=grid_weather_enabled,
+            grid_weather_source=grid_weather_source,
+            grid_weather_dry_run=grid_weather_dry_run,
+            grid_weather_fixture_json=grid_weather_fixture_json,
+            grid_weather_bbox=grid_weather_bbox,
+            grid_weather_max_points=grid_weather_max_points,
+            grid_weather_lookahead_hours=grid_weather_lookahead_hours,
+            grid_weather_variables=grid_weather_variables,
+            grid_weather_cell_size_degrees=grid_weather_cell_size_degrees,
+            grid_weather_refuse_large_bbox=grid_weather_refuse_large_bbox,
+            fire_weather_match_radius_km=fire_weather_match_radius_km,
+            fire_weather_match_max_time_delta_hours=fire_weather_match_max_time_delta_hours,
+            fire_weather_match_method=fire_weather_match_method,
+            plume_model_version=plume_model_version,
+            plume_grid_fallback_to_station=plume_grid_fallback_to_station,
             jdbc_url=jdbc_url,
             smoke_risk_model_version=smoke_risk_model_version,
             smoke_risk_lookback_hours=smoke_risk_lookback_hours,

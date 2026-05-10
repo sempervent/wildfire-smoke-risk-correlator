@@ -18,6 +18,12 @@ openaq:
   max_retries: 5
   backoff_seconds_base: 1.5
 
+grid_weather:
+  bbox_default: "-88.2,34.9,-81.6,36.7"
+  max_points_default: 100
+  lookahead_hours_default: 24
+  cell_size_degrees_default: 0.05
+
 kafka:
   firms_raw_topic: "firms.hotspots.raw"
   firms_dlq_topic: "firms.hotspots.dlq"
@@ -26,6 +32,9 @@ kafka:
   wind_raw_topic: "weather.wind.raw"
   wind_dlq_topic: "weather.wind.dlq"
   wind_normalized_topic: "weather.wind.normalized"
+  grid_weather_raw_topic: "weather.grid.raw"
+  grid_weather_dlq_topic: "weather.grid.dlq"
+  grid_weather_normalized_topic: "weather.grid.normalized"
   fire_normalized_topic: "fire.detections.normalized"
   air_quality_normalized_topic: "air_quality.measurements.normalized"
   normalization_errors_topic: "normalization.errors"
