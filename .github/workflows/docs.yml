@@ -29,6 +29,9 @@ jobs:
       - name: Sync dependencies (docs extra)
         run: uv sync --extra dev --extra docs
 
+      - name: Configure GitHub Pages
+        uses: actions/configure-pages@v5
+
       - name: MkDocs strict build
         run: make docs-check
 
