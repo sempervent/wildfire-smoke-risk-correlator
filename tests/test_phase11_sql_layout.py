@@ -22,7 +22,7 @@ def test_phase11_migration_initdb_views_exist() -> None:
 
 
 def test_phase9_fn_lists_dispersion_alert_types() -> None:
-    fn_path = repo_root() / "sql/views/zzz_phase9_fn_alert_candidates.sql"
+    fn_path = repo_root() / "sql/migrations/013_phase14_canonical_alert_function.sql"
     txt = fn_path.read_text()
     assert "p_high_dispersion_exposure_min" in txt
     assert "high_dispersion_exposure" in txt

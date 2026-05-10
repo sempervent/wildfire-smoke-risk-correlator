@@ -9,7 +9,8 @@ def test_phase9_migrations_initdb_views_and_alert_fn_exist() -> None:
     i74 = root / "docker/postgres/initdb/74_phase9_gridded_weather.sql"
     vgrid = root / "sql/views/zzz_phase9_gridded_weather_views.sql"
     val = root / "sql/views/zzz_phase9_fn_alert_candidates.sql"
-    for p in (m9, i74, vgrid, val):
+    m13 = root / "sql/migrations/013_phase14_canonical_alert_function.sql"
+    for p in (m9, i74, vgrid, val, m13):
         assert p.is_file(), f"missing {p}"
 
     ddl = m9.read_text()
@@ -23,14 +24,19 @@ def test_phase9_migrations_initdb_views_and_alert_fn_exist() -> None:
     assert "v_latest_smoke_plume_exposures_v2" in views_txt
     assert "v_latest_smoke_risk_v4" in views_txt
 
-    alerts_txt = val.read_text()
-    assert "p_grid_weather_stale_hours" in alerts_txt
-    assert "grid_weather_stale" in alerts_txt
-    assert "no_recent_grid_weather" in alerts_txt
-    assert "fire_weather_unmatched_high" in alerts_txt
-    assert "grid_weather_parse_errors_high" in alerts_txt
-    assert "integration_pipeline_incomplete" in alerts_txt
-    assert "v4_risk_missing" in alerts_txt
-    assert "fire_weather_match_missing" in alerts_txt
-    assert "high_dispersion_exposure" in alerts_txt
-    assert "dispersion_no_wind_matches" in alerts_txt
+    stub_txt = val.read_text()
+    assert "migration 013" in stub_txt.lower() or "013_phase14" in stub_txt
+
+    canon = m13.read_text()
+    assert "DROP FUNCTION IF EXISTS analytics.fn_alert_candidates" in canon
+    assert "CREATE OR REPLACE FUNCTION analytics.fn_alert_candidates" in canon
+    assert "p_grid_weather_stale_hours" in canon
+    assert "grid_weather_stale" in canon
+    assert "no_recent_grid_weather" in canon
+    assert "fire_weather_unmatched_high" in canon
+    assert "grid_weather_parse_errors_high" in canon
+    assert "integration_pipeline_incomplete" in canon
+    assert "v4_risk_missing" in canon
+    assert "fire_weather_match_missing" in canon
+    assert "high_dispersion_exposure" in canon
+    assert "dispersion_no_wind_matches" in canon
