@@ -10,6 +10,7 @@ POSTGRES_DB="${POSTGRES_DB:-smoke}"
 
 STRICT_ALIGNED_ASSERTS="${STRICT_ALIGNED_ASSERTS:-0}"
 EXPECT_PARSE_ERRORS="${EXPECT_PARSE_ERRORS:-0}"
+EXPECT_DISPERSION="${EXPECT_DISPERSION:-0}"
 
 fail() {
   echo "ASSERT_FAILED: $*" >&2
@@ -50,6 +51,11 @@ have_relation analytics kafka_consumer_lag_observations || fail "missing analyti
 have_relation analytics parse_errors || fail "missing analytics.parse_errors"
 have_relation analytics notification_attempts || fail "missing analytics.notification_attempts"
 
+if [[ "${EXPECT_DISPERSION}" == "1" ]]; then
+  have_relation analytics smoke_dispersion_exposures || fail "missing analytics.smoke_dispersion_exposures"
+  have_relation analytics dispersion_aq_comparisons || fail "missing analytics.dispersion_aq_comparisons"
+fi
+
 FIRE_N="$(psql_exec -At -c "SELECT COUNT(*)::text FROM normalized.fire_detections;")"
 AQ_N="$(psql_exec -At -c "SELECT COUNT(*)::text FROM normalized.air_quality_measurements;")"
 WIND_N="$(psql_exec -At -c "SELECT COUNT(*)::text FROM normalized.wind_observations;")"
@@ -57,6 +63,8 @@ GRID_N="$(psql_exec -At -c "SELECT COUNT(*)::text FROM normalized.weather_grid_c
 MATCH_N="$(psql_exec -At -c "SELECT COUNT(*)::text FROM analytics.fire_weather_matches;")"
 PLUME_N="$(psql_exec -At -c "SELECT COUNT(*)::text FROM analytics.smoke_plume_exposures WHERE model_version='wind_grid_v2';")"
 V4_N="$(psql_exec -At -c "SELECT COUNT(*)::text FROM analytics.smoke_risk_scores WHERE model_version='v4';")"
+V5_N="$(psql_exec -At -c "SELECT COUNT(*)::text FROM analytics.smoke_risk_scores WHERE model_version='v5';")"
+DISP_N="$(psql_exec -At -c "SELECT COUNT(*)::text FROM analytics.smoke_dispersion_exposures;")"
 OFF_N="$(psql_exec -At -c "SELECT COUNT(*)::text FROM analytics.kafka_topic_offsets;")"
 LAG_N="$(psql_exec -At -c "SELECT COUNT(*)::text FROM analytics.kafka_consumer_lag_observations;")"
 
@@ -86,6 +94,9 @@ fi
 if [[ "${V4_N}" -lt 1 ]]; then
   warn "no analytics.smoke_risk_scores rows for model_version=v4 (expected when RISK_MODEL_VERSION=v4)"
 fi
+if [[ "${V5_N}" -lt 1 ]]; then
+  warn "no analytics.smoke_risk_scores rows for model_version=v5 (expected when RISK_MODEL_VERSION=v5)"
+fi
 
 if [[ "${STRICT_ALIGNED_ASSERTS}" == "1" ]]; then
   if [[ "${MATCH_N}" -lt 1 ]]; then
@@ -94,8 +105,17 @@ if [[ "${STRICT_ALIGNED_ASSERTS}" == "1" ]]; then
   if [[ "${PLUME_N}" -lt 1 ]]; then
     fail "STRICT_ALIGNED_ASSERTS: expected wind_grid_v2 plume rows >= 1, got ${PLUME_N}"
   fi
-  if [[ "${V4_N}" -lt 1 ]]; then
-    fail "STRICT_ALIGNED_ASSERTS: expected v4 risk rows >= 1, got ${V4_N}"
+  if [[ "${EXPECT_DISPERSION}" == "1" ]]; then
+    if [[ "${DISP_N}" -lt 1 ]]; then
+      fail "EXPECT_DISPERSION=1: expected analytics.smoke_dispersion_exposures >= 1, got ${DISP_N}"
+    fi
+    if [[ "${V5_N}" -lt 1 ]]; then
+      fail "EXPECT_DISPERSION=1: expected v5 risk rows >= 1, got ${V5_N}"
+    fi
+  else
+    if [[ "${V4_N}" -lt 1 ]]; then
+      fail "STRICT_ALIGNED_ASSERTS: expected v4 risk rows >= 1, got ${V4_N}"
+    fi
   fi
 fi
 
@@ -104,4 +124,4 @@ if [[ "${EXPECT_PARSE_ERRORS}" == "0" ]] && [[ "${OPEN_PE}" != "0" ]]; then
   warn "open parse_errors=${OPEN_PE} (EXPECT_PARSE_ERRORS=0)"
 fi
 
-echo "assert-integration-state OK (fires=${FIRE_N} aq=${AQ_N} wind=${WIND_N} grid=${GRID_N} matches=${MATCH_N} plume_v2=${PLUME_N} v4=${V4_N} offsets=${OFF_N} lag_obs=${LAG_N})"
+echo "assert-integration-state OK (fires=${FIRE_N} aq=${AQ_N} wind=${WIND_N} grid=${GRID_N} matches=${MATCH_N} plume_v2=${PLUME_N} v4=${V4_N} v5=${V5_N} dispersion=${DISP_N} offsets=${OFF_N} lag_obs=${LAG_N})"

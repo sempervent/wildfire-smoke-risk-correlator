@@ -75,6 +75,19 @@ step compute_plume start
 bash "${ROOT_DIR}/scripts/run_compute_plume.sh"
 step compute_plume ok
 
+DISPERSION_ENABLED="${DISPERSION_ENABLED:-0}"
+if [[ "${DISPERSION_ENABLED}" == "1" ]]; then
+  echo "==> Compute dispersion (DISPERSION_ENABLED=1)"
+  step compute_dispersion start
+  bash "${ROOT_DIR}/scripts/run_compute_dispersion.sh"
+  step compute_dispersion ok
+  step compare_dispersion_aq start
+  bash "${ROOT_DIR}/scripts/run_compare_dispersion_aq.sh"
+  step compare_dispersion_aq ok
+  export RISK_MODEL_VERSION="${RISK_MODEL_VERSION:-v5}"
+  export SMOKE_RISK_MODEL_VERSION="${SMOKE_RISK_MODEL_VERSION:-v5}"
+fi
+
 echo "==> Compute risk"
 step compute_risk start
 bash "${ROOT_DIR}/scripts/run_compute_risk.sh"

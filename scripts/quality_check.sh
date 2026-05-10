@@ -179,6 +179,41 @@ else
   warn "analytics.v_integration_pipeline_counts missing (apply sql/views/zzz_phase10_10_integration_and_calibration_views.sql)."
 fi
 
+echo "==> Phase 11 dispersion surfaces (warnings)"
+DIS_TBL="$(psql_exec -At -c "SELECT COUNT(*) FROM information_schema.tables WHERE table_schema='analytics' AND table_name='smoke_dispersion_exposures';")"
+if [[ "${DIS_TBL}" != "1" ]]; then
+  warn "analytics.smoke_dispersion_exposures missing (apply sql/migrations/011_phase11_dispersion.sql)."
+else
+  psql_exec -c "SELECT COUNT(*) FROM analytics.v_dispersion_operational_summary;" >/dev/null 2>&1 || warn "analytics.v_dispersion_operational_summary missing (apply Phase 11 views)."
+  psql_exec -c "SELECT COUNT(*) FROM analytics.v_latest_smoke_risk_v5;" >/dev/null 2>&1 || warn "analytics.v_latest_smoke_risk_v5 missing (apply Phase 11 views)."
+fi
+
+if [[ "${DISPERSION_ENABLED:-0}" == "1" ]]; then
+  DIS_N="$(psql_exec -At -c "SELECT COUNT(*)::text FROM analytics.smoke_dispersion_exposures;")"
+  if [[ "${DIS_TBL}" == "1" ]] && [[ "${DIS_N}" == "0" ]]; then
+    warn "DISPERSION_ENABLED=1 but analytics.smoke_dispersion_exposures is empty (run make compute-dispersion)."
+  fi
+  FW="$(psql_exec -At -c "
+    SELECT COUNT(*)::text FROM normalized.fire_detections f
+    WHERE f.acq_datetime >= now() - interval '24 hours'
+      AND EXISTS (SELECT 1 FROM analytics.fire_weather_matches m WHERE m.detection_id = f.detection_id)
+      AND NOT EXISTS (SELECT 1 FROM analytics.smoke_dispersion_exposures e WHERE e.detection_id = f.detection_id);
+  ")"
+  if [[ "${FW}" =~ ^[0-9]+$ ]] && [[ "${FW}" != "0" ]]; then
+    warn "DISPERSION_ENABLED=1 but recent matched fires lack dispersion rows (count=${FW})."
+  fi
+  V5R="$(psql_exec -At -c "SELECT COUNT(*)::text FROM analytics.smoke_risk_scores WHERE model_version='v5';")"
+  if [[ "${RISK_MODEL_VERSION:-}" == "v5" ]] || [[ "${SMOKE_RISK_MODEL_VERSION:-}" == "v5" ]]; then
+    if [[ "${V5R}" == "0" ]]; then
+      warn "v5 risk requested but analytics.smoke_risk_scores has no model_version=v5 rows."
+    fi
+  fi
+  AQCOMP="$(psql_exec -At -c "SELECT COUNT(*)::text FROM analytics.dispersion_aq_comparisons;")"
+  if [[ "${AQCOMP}" == "0" ]]; then
+    warn "DISPERSION_ENABLED=1 but dispersion_aq_comparisons empty (optional — run compare-dispersion-aq when AQ data exists)."
+  fi
+fi
+
 echo "==> Parse errors / consumer offset evidence (warnings)"
 OPEN_PE="$(psql_exec -At -c "SELECT COUNT(*)::text FROM analytics.parse_errors WHERE status = 'open';")"
 if [[ "${OPEN_PE}" != "0" ]]; then

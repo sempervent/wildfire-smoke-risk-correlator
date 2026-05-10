@@ -37,6 +37,10 @@ This repository is a **local-first vertical slice** for correlating NASA FIRMS h
 - **Live NWS gridpoint ingest:** keep **`GRID_WEATHER_BBOX`** / **`GRID_WEATHER_POINTS`** + **`GRID_WEATHER_MAX_POINTS`** as the primary bounds—never expand to “whole CONUS” by default.
 - **Fixture timestamp rewriting:** **`FIXTURE_TIME_MODE=relative`** mutates **Kafka payloads in memory only**; **never rewrite fixture files on disk** as part of normal replay.
 - **Calibration hooks:** **`analytics.risk_observations`**, **`analytics.risk_model_evaluations`**, and **`make evaluate-risk`** are **evaluation scaffolding**, not validated epidemiology or forecasting science—do not treat outputs as peer-reviewed metrics without external methodology.
+- **Phase 11 Gaussian proxy:** never describe **`gaussian_v0`** as validated atmospheric dispersion, HYSPLIT-class transport, or regulatory modeling—it is a **bounded engineering correlation weight** over census centroids. **`wind_v1` / `wind_grid_v2`** remain separate corridor heuristics; all three are **not** public-health advisories.
+- **Dispersion runs stay bounded:** respect **`DISPERSION_MAX_DISTANCE_KM`**, **`DISPERSION_MAX_TARGET_GEOGRAPHIES`**, **`DISPERSION_LOOKBACK_HOURS`**, and tract corpus guards (**`DISPERSION_ALLOW_LARGE_RUN`**)—no implicit national-scale tract fan-out.
+- **AQ comparison table:** **`analytics.dispersion_aq_comparisons`** and **`make compare-dispersion-aq`** are **lag-summary scaffolding** only; they do not establish forecast skill or epidemiological association without external study design.
+- **Fixture / integration path:** `make integration-regression` and **`make dispersion-demo`** must remain **no live API keys** when using dry-run + aligned fixtures.
 
 ## Operating constraints
 

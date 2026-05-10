@@ -17,10 +17,12 @@ export GRID_WEATHER_ENABLED="${GRID_WEATHER_ENABLED:-1}"
 
 export PLUME_MODEL_VERSION="${PLUME_MODEL_VERSION:-wind_grid_v2}"
 export PLUME_GRID_FALLBACK_TO_STATION="${PLUME_GRID_FALLBACK_TO_STATION:-1}"
-export RISK_MODEL_VERSION="${RISK_MODEL_VERSION:-v4}"
-export SMOKE_RISK_MODEL_VERSION="${SMOKE_RISK_MODEL_VERSION:-v4}"
+export DISPERSION_ENABLED="${DISPERSION_ENABLED:-1}"
+export RISK_MODEL_VERSION="${RISK_MODEL_VERSION:-v5}"
+export SMOKE_RISK_MODEL_VERSION="${SMOKE_RISK_MODEL_VERSION:-v5}"
 
 export STRICT_ALIGNED_ASSERTS="${STRICT_ALIGNED_ASSERTS:-1}"
+export EXPECT_DISPERSION="${EXPECT_DISPERSION:-1}"
 
 echo "==> integration-regression (no live API keys; SKIP_BOOTSTRAP=${SKIP_BOOTSTRAP} RUN_BOOTSTRAP=${RUN_BOOTSTRAP})"
 
@@ -57,8 +59,14 @@ make match-fire-weather
 echo "==> Plume wind_grid_v2"
 make compute-plume PLUME_MODEL_VERSION="${PLUME_MODEL_VERSION}"
 
-echo "==> Risk v4"
+echo "==> Dispersion gaussian_v0 (DISPERSION_ENABLED=${DISPERSION_ENABLED})"
+make compute-dispersion DISPERSION_ENABLED="${DISPERSION_ENABLED}"
+
+echo "==> Risk ${RISK_MODEL_VERSION}"
 make compute-risk RISK_MODEL_VERSION="${RISK_MODEL_VERSION}"
+
+echo "==> Dispersion vs AQ lag comparison"
+make compare-dispersion-aq DISPERSION_ENABLED="${DISPERSION_ENABLED}"
 
 make collect-lag
 

@@ -20,6 +20,8 @@ This repository implements a **Kafka + Spark + PostGIS** pipeline that correlate
 
 **Phase 10** adds **no-secrets Compose integration regression** (`make integration-regression`; optional **`RUN_BOOTSTRAP=1`** / default **`SKIP_BOOTSTRAP=1`** to avoid census re-download), **fixture timestamp modes** (`FIXTURE_TIME_MODE=static|relative` with **`FIXTURE_RELATIVE_BASE_HOURS_AGO`**) that rewrite payloads **in memory only** (metadata: **`original_observed_at`**, **`fixture_time_rewritten`**), **deterministic aligned fixtures** (`USE_ALIGNED_FIXTURES=1`), **`make assert-integration-state`** / **`scripts/assert_integration_state.sh`**, **`make evaluate-risk`** over **`analytics.risk_observations`** vs **`analytics.smoke_risk_scores`** (exits **0** when nothing to compare), a **`GridWeatherProvider`** abstraction (**fixture** + **NWS `/points` → `forecastGridData`** with point cache and **`GRID_WEATHER_POINTS`** / **`GRID_WEATHER_MAX_POINTS`** bounds), calibration DDL (**`analytics.risk_observations`**, **`analytics.risk_model_evaluations`**) + SQL views (`analytics.v_integration_pipeline_counts`, …), new alert candidates (**`integration_pipeline_incomplete`**, **`v4_risk_missing`**, **`fire_weather_match_missing`**) with runbooks, **`make integration-smoke-test`**, and Grafana panels for pipeline counts / v4 explanations / unmatched fire–weather / calibration summaries.
 
+**Phase 11** adds a **bounded Gaussian dispersion proxy** (`DISPERSION_MODEL_VERSION=gaussian_v0`) materialized as **`analytics.smoke_dispersion_exposures`**, optional **AQ lag-window comparisons** (`analytics.dispersion_aq_comparisons`; scaffolding only), **risk model `v5`** (v2-style base blended with plume + dispersion + capped humidity dampening), **`make compute-dispersion`** / **`make compare-dispersion-aq`** / **`make dispersion-demo`**, **`DISPERSION_ENABLED=1`** hooks in **`make operational-cycle`** (defaults **off**), new alert candidates (**`high_dispersion_exposure`**, **`dispersion_no_wind_matches`**, **`dispersion_no_targets`**, **`dispersion_aq_mismatch_high`**), Grafana tables, and **`EXPECT_DISPERSION=1`** strict assertions in **`make integration-regression`**. **Not HYSPLIT**, **not regulatory dispersion**, **not a health model** — compare against corridor plumes (`wind_v1` / `wind_grid_v2`) only as distinct engineering heuristics.
+
 Wind direction uses the **meteorological convention** (*wind FROM*); modeled smoke transport uses the **opposite bearing** (see `src/wildfire_smoke/wind.py`).
 
 **Important:** the risk score is a **demonstration / operations correlation index**, not a health advisory model.
@@ -201,7 +203,7 @@ make grafana-up
 ### Alerting / SLIs (SQL-first)
 
 - **Views:** `analytics.v_sli_*` surface ingestion failures, freshness ages, sparse recent rows, and high-risk rows.
-- **Candidates:** `analytics.fn_alert_candidates(...)` unions actionable rows with **17** threshold parameters (freshness, risk/plume, parse-error counts, consumer-offset stale hours, parser spike counts, Kafka lag message floors, DLQ depth proxy floors, grid-weather staleness hours, fire–weather unmatched warn/critical counts — see `scripts/check_alerts.sh` / `wildfire_smoke.alert_thresholds`). `analytics.v_alert_candidates` applies SQL defaults on the function (CLI passes env-derived values).
+- **Candidates:** `analytics.fn_alert_candidates(...)` unions actionable rows with **20** threshold parameters (freshness, risk/plume, parse-error counts, consumer-offset stale hours, parser spike counts, Kafka lag message floors, DLQ depth proxy floors, grid-weather staleness hours, fire–weather unmatched warn/critical counts, **dispersion** floors — see `scripts/check_alerts.sh` / `wildfire_smoke.alert_thresholds`). `analytics.v_alert_candidates` applies SQL defaults on the function (CLI passes env-derived values).
 - **CLI:** `make alerts-check` prints candidates and exits **2** if any **`severity = critical`** exists. Set **`ALERTS_WARN_ONLY=1`** to always exit 0 (recommended for fixture demos where timestamps are intentionally stale).
 - **Threshold env:** `ALERT_FRESHNESS_WARN_HOURS` (default 6), `ALERT_FRESHNESS_CRITICAL_HOURS` (24), `ALERT_HIGH_RISK_MIN_SCORE` (75), `ALERT_LOOKBACK_HOURS` (24), `ALERT_HIGH_PLUME_EXPOSURE_MIN_SCORE` (70), `ALERT_PARSE_ERRORS_WARN_COUNT` (1), `ALERT_PARSE_ERRORS_CRITICAL_COUNT` (25), `ALERT_CONSUMER_OFFSET_STALE_HOURS` (6), `ALERT_PARSER_SPIKE_WARN_COUNT` (15), `ALERT_PARSER_SPIKE_CRITICAL_COUNT` (40), `ALERT_KAFKA_LAG_WARN_MESSAGES` (100), `ALERT_KAFKA_LAG_CRITICAL_MESSAGES` (1000), `ALERT_DLQ_DEPTH_WARN_MESSAGES` (1), `ALERT_DLQ_DEPTH_CRITICAL_MESSAGES` (100), `ALERT_GRID_WEATHER_STALE_HOURS` (6), `ALERT_FIRE_WEATHER_UNMATCHED_WARN_COUNT` (5), `ALERT_FIRE_WEATHER_UNMATCHED_CRITICAL_COUNT` (25).
 
@@ -437,9 +439,9 @@ This wipes the Postgres volume, recreates topics, re-downloads Census data for t
 
 **Full pipeline regression (no API keys)**
 
-- **`make integration-regression`** runs topics → FIRMS/OpenAQ/wind/grid fixture replay → normalizers → match → plume **`wind_grid_v2`** → risk **`v4`** → lag → quality → alerts (warn-only check, dry-run materialize, console send) → **`make assert-integration-state`**.
+- **`make integration-regression`** runs topics → FIRMS/OpenAQ/wind/grid fixture replay → normalizers → match → plume **`wind_grid_v2`** → **`make compute-dispersion`** → risk **`v5`** → **`make compare-dispersion-aq`** → lag → quality → alerts (warn-only check, dry-run materialize, console send) → **`make assert-integration-state`** (strict mode expects dispersion rows when **`EXPECT_DISPERSION=1`**).
 - Defaults **`SKIP_BOOTSTRAP=1`** (skips **`make db-bootstrap`**). Set **`RUN_BOOTSTRAP=1`** for a full census pull + migrations on a fresh volume.
-- Uses **`FIXTURE_TIME_MODE=relative`** and **`USE_ALIGNED_FIXTURES=1`** so downstream assertions can expect fire–weather matches, plume rows, and v4 explanations without mutating files on disk.
+- Uses **`FIXTURE_TIME_MODE=relative`**, **`USE_ALIGNED_FIXTURES=1`**, **`DISPERSION_ENABLED=1`**, and **`EXPECT_DISPERSION=1`** so downstream assertions can expect fire–weather matches, plume rows, dispersion exposures, and **`v5`** scores without mutating files on disk.
 - **`make integration-smoke-test`** validates script wiring without running the full heavy loop by default.
 
 **Fixture time and aligned data**
@@ -462,6 +464,26 @@ This wipes the Postgres volume, recreates topics, re-downloads Census data for t
 
 - Apply **`sql/migrations/010_phase10_calibration.sql`** (and views **`sql/views/zzz_phase10_10_integration_and_calibration_views.sql`**) via **`make db-bootstrap`** or **`psql`** on existing volumes. **`analytics.fn_alert_candidates`** must be reapplied after those views exist (see bootstrap order under `sql/views/`).
 
+### Phase 11 — Gaussian dispersion proxy + risk v5
+
+**What `gaussian_v0` does (engineering)**
+
+- For each recent fire with resolved grid (**preferred**) or station wind, score nearby county/tract **centroids** within **`DISPERSION_MAX_DISTANCE_KM`** using separable Gaussian weights on **downwind / crosswind** axes (see `src/wildfire_smoke/dispersion.py`), a **source-strength** proxy (**FRP / brightness / unit**), and a capped **wind-speed** factor. **Upwind** targets receive ~**zero** proxy by construction.
+- **`make compute-dispersion`** writes **`analytics.smoke_dispersion_exposures`**; **`RISK_MODEL_VERSION=v5`** blends **55%** normalized **v2 base**, **20%** max plume (**`/100`**), **25%** max dispersion (**`/100`**), then applies the same **≤25%** humidity dampener as **v4** when grid RH exists.
+
+**How this differs from plume corridor models**
+
+- **`wind_v1` / `wind_grid_v2`** implement a **fixed angular corridor** heuristic. **`gaussian_v0`** is a **smooth 2D kernel** along/adjacent to the downwind axis—still **not** a puff model, chemistry, or terrain-aware solver.
+
+**Operational flags**
+
+- Default **`DISPERSION_ENABLED=0`**. Set **`DISPERSION_ENABLED=1`** in **`make operational-cycle`** to run dispersion + AQ compare + default **`v5`** risk (unless **`RISK_MODEL_VERSION`** overrides).
+- **`make dispersion-demo`** runs the full aligned no-secrets chain including **`v5`**.
+
+**Phase 11 DDL**
+
+- Apply **`sql/migrations/011_phase11_dispersion.sql`** and **`sql/views/zzz_phase11_dispersion_views.sql`** before relying on Grafana panels or dispersion alerts (fresh volumes pick these up via **`make db-bootstrap`**).
+
 ## Makefile targets
 
 | Target          | Purpose                                              |
@@ -481,6 +503,9 @@ This wipes the Postgres volume, recreates topics, re-downloads Census data for t
 | `make grid-weather-demo` | End-to-end grid fixture → normalize → match → plume v2 → risk v4 |
 | `make grid-weather-smoke-test` | **`GRID_WEATHER_SMOKE=1`** smoke wrapper |
 | `make compute-plume` | **`wind_v1`** / **`wind_grid_v2`** corridor exposures (PostGIS job)    |
+| `make compute-dispersion` | Gaussian **`gaussian_v0`** proxy into **`analytics.smoke_dispersion_exposures`** (**`DISPERSION_ENABLED=1`**) |
+| `make compare-dispersion-aq` | Lag-window AQ scaffolding vs dispersion (**`DISPERSION_ENABLED=1`**) |
+| `make dispersion-demo` | Aligned fixtures → normalize/grid → plume → dispersion → risk **v5** → AQ compare |
 | `make compute-risk`   | Run Python smoke-risk job (in Spark container)   |
 | `make replay-fixtures`| Fixture Kafka publish + normalize + plume + risk |
 | `make replay-wind-fixtures` | Publish **`WIND_DRY_RUN`** wind fixture + normalize-wind |
@@ -545,6 +570,7 @@ Stable analytics views for dashboards include:
 - **Phase 8 lag / replay:** `analytics.v_kafka_topic_depth`, `analytics.v_consumer_lag_latest`, `analytics.v_dlq_topic_depth`, `analytics.v_pipeline_lag_summary`, `analytics.v_dlq_replay_runs`, `analytics.v_dlq_replay_items_recent`
 - **Phase 9 grid weather:** `analytics.v_latest_weather_grid_cells`, `analytics.v_latest_weather_grid_cells_geojson`, `analytics.v_fire_weather_matches`, `analytics.v_fire_weather_match_summary`, `analytics.v_latest_smoke_plume_exposures_v2`, `analytics.v_latest_smoke_risk_v4`, `analytics.v_grid_weather_operational_summary`
 - **Phase 10 integration / calibration:** `analytics.v_integration_pipeline_counts`, `analytics.v_latest_risk_v4_explanations`, `analytics.v_fire_weather_unmatched`, `analytics.v_risk_observations`, `analytics.v_risk_model_evaluations`, `analytics.v_risk_calibration_summary`
+- **Phase 11 dispersion:** `analytics.v_latest_smoke_dispersion_exposures`, `analytics.v_top_dispersion_exposures`, `analytics.v_dispersion_operational_summary`, `analytics.v_dispersion_aq_comparisons`, `analytics.v_latest_smoke_risk_v5`, `analytics.v_dispersion_model_debug`
 - **Phase 3 SLIs / alerts:** `analytics.v_sli_*`, `analytics.v_alert_candidates`, `analytics.fn_alert_candidates(...)`
 
 Producer runs append rows to **`analytics.ingestion_runs`** (`run_id`, `source`, `mode` `live|dry_run`, counts, `config` JSON without secrets, `error_message` on failure).

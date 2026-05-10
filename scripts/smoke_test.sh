@@ -136,6 +136,10 @@ test -f "${ROOT_DIR}/docs/runbooks/fire-weather-unmatched-high.md"
 test -f "${ROOT_DIR}/docs/runbooks/integration-pipeline-incomplete.md"
 test -f "${ROOT_DIR}/docs/runbooks/v4-risk-missing.md"
 test -f "${ROOT_DIR}/docs/runbooks/fire-weather-match-missing.md"
+test -f "${ROOT_DIR}/docs/runbooks/high-dispersion-exposure.md"
+test -f "${ROOT_DIR}/docs/runbooks/dispersion-no-wind-matches.md"
+test -f "${ROOT_DIR}/docs/runbooks/dispersion-aq-mismatch-high.md"
+test -f "${ROOT_DIR}/docs/runbooks/dispersion-no-targets.md"
 
 echo "==> Phase 9 gridded weather (tables / views / topics)"
 for t in weather.grid.raw weather.grid.dlq weather.grid.normalized; do
@@ -157,6 +161,17 @@ bash -n "${ROOT_DIR}/scripts/evaluate_risk_model.sh"
 ${COMPOSE} exec -T postgres psql -v ON_ERROR_STOP=1 -U "${POSTGRES_USER}" -d "${POSTGRES_DB}" -c "SELECT COUNT(*) FROM analytics.risk_observations;" >/dev/null 2>&1 || echo "WARN: analytics.risk_observations missing (apply migration 010)." >&2
 ${COMPOSE} exec -T postgres psql -v ON_ERROR_STOP=1 -U "${POSTGRES_USER}" -d "${POSTGRES_DB}" -c "SELECT COUNT(*) FROM analytics.v_integration_pipeline_counts;" >/dev/null 2>&1 || echo "WARN: analytics.v_integration_pipeline_counts missing (apply Phase 10 views)." >&2
 bash "${ROOT_DIR}/scripts/evaluate_risk_model.sh"
+
+echo "==> Phase 11 dispersion scripts / DDL hooks"
+bash -n "${ROOT_DIR}/scripts/run_compute_dispersion.sh"
+bash -n "${ROOT_DIR}/scripts/run_compare_dispersion_aq.sh"
+bash -n "${ROOT_DIR}/scripts/dispersion_demo.sh"
+${COMPOSE} exec -T postgres psql -v ON_ERROR_STOP=1 -U "${POSTGRES_USER}" -d "${POSTGRES_DB}" -c "SELECT COUNT(*) FROM analytics.smoke_dispersion_exposures;" >/dev/null 2>&1 || echo "WARN: analytics.smoke_dispersion_exposures missing (apply migration 011)." >&2
+
+if [[ "${DISPERSION_SMOKE:-0}" == "1" ]]; then
+  echo "==> DISPERSION_SMOKE=1: dispersion demo chain (Spark-heavy)"
+  bash "${ROOT_DIR}/scripts/dispersion_demo.sh"
+fi
 
 echo "==> Phase 4 alert persistence + routing (table + dry-run materialize + console send)"
 ${COMPOSE} exec -T postgres psql -v ON_ERROR_STOP=1 -U "${POSTGRES_USER}" -d "${POSTGRES_DB}" -c \
