@@ -51,6 +51,16 @@ This repository is a **local-first vertical slice** for correlating NASA FIRMS h
 - **Release artifacts honesty:** **`CHANGELOG.md`**, **`docs/release/*.md`**, and tagged milestones must **not** claim peer-reviewed scientific validation — describe **engineering scope** and **limitations** explicitly.
 - **Calibration exports:** **`artifacts/calibration/*`** bundles are **immutable review snapshots** for operators — not regulatory submissions; **`metadata.json`** must remain free of **passwords**, raw **DSN strings**, **API keys**, and **webhook secrets** (hosts are redacted away from localhost).
 - **Integration workflows:** Compose-backed jobs may stay **manual**, **scheduled**, and/or **label-gated** when too heavy for every PR — prefer fast static CI on pushes.
+
+## Documentation (MkDocs and README)
+
+- **MkDocs** is the canonical **user-facing** documentation (**`docs/`**, **`mkdocs.yml`**). Organize by **task and concept** (getting started, ingest, dashboards, troubleshooting) — **not** by internal implementation chronology (“Phase N”).
+- **README.md** is the **front door**: short overview, non-claims, quickstart, links into **`docs/`** or the hosted site — **not** a build diary.
+- **Release notes / CHANGELOG** may mention historical implementation context when useful for archaeology; **current** operator docs should stay phase-neutral.
+- **Non-claims** (health, regulatory dispersion, emergency use) must remain visible in user docs and release notes.
+- **Before a release:** **`make docs-check`** (**`mkdocs build --strict`**) must pass alongside tests.
+- Prefer **reproducible commands** and **no-secrets** demo paths in examples.
+
 - **Phase 14 alert function integrity:** never ship or tolerate **multiple `analytics.fn_alert_candidates` overloads** — maintain exactly **one** canonical **23-parameter** signature (migration **`013_phase14_canonical_alert_function.sql`**). Use **`make db-doctor`** to detect drift and **`make repair-alert-function`** on disposable/repairable volumes when overloads accumulate.
 - **Migration repair scripts** (`repair-alert-function`, **`bootstrap_db.sh`**) must remain **idempotent** and safe to re-run after partial failures.
 - **`make release-check`** and **`make release-manifest`** must stay **no-secrets** — manifests and CI logs never carry passwords, raw DSNs, API keys, or webhook tokens.

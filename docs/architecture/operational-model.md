@@ -2,26 +2,25 @@
 
 ## Roles
 
-- **Developers** iterate on producers, Spark jobs, SQL views, and Python jobs using **`uv`** + Compose.
-- **Operators** run scripted targets (`Makefile`, `scripts/*.sh`), inspect Postgres views, and tune thresholds via env vars documented in **`.env.example`**.
+- **Developers** work with producers, Spark jobs, SQL, and Python using **`uv`** and Compose.
+- **Operators** run **`Makefile`** targets and **`scripts/*.sh`**, tune **`ALERT_*`** and related env vars (see **`.env.example`**).
 
 ## Environments
 
 - **Local Compose** is the reference runtime for demos and integration checks.
-- **CI** separates **fast static checks** (no Compose) from **optional integration** (Compose + minimal census + bounded fixtures).
+- **CI** runs fast static checks without Compose; optional workflows exercise Compose with **minimal census** fixtures.
 
 ## Safety defaults
 
-- Dry-run producers avoid network secrets (`*_DRY_RUN=1`).
-- Alert checks often run **`ALERTS_WARN_ONLY=1`** during fixture-heavy smoke because timestamps look stale versus freshness SLIs.
-- **Minimal census bootstrap** (`make db-bootstrap-minimal`) may **`TRUNCATE`** geo tables when **`MINIMAL_CENSUS_REPLACE_ALL=1`** — **CI/dev only**, not a production migration path.
+- Dry-run producers (`*_DRY_RUN=1`) avoid live vendor calls for demos.
+- **`ALERTS_WARN_ONLY=1`** is common with stale fixtures so freshness SLIs do not page incorrectly.
+- **`make db-bootstrap-minimal`** with **`MINIMAL_CENSUS_REPLACE_ALL=1`** can **truncate** geo tables — **disposable DBs / CI only**.
 
 ## Releases
 
-- **`make release-check`** is the maintainer gate before tagging; it assumes **Compose is available** for **`make smoke-test`** unless you adapt the environment.
-- **`CHANGELOG.md`** and **`docs/release/v1.0.0.md`** describe milestone scope — explicitly **not** scientific validation or public-health proof.
+- **`make release-check`** is the maintainer gate (lint, tests, docs strict build, smoke).
+- **`CHANGELOG.md`** and **`docs/release/`** describe scope; they do **not** claim scientific validation.
 
-## Immutable calibration snapshots
+## Calibration exports
 
-- Exports are **point-in-time review bundles** for drift inspection and incident retrospectives.
-- Treat them like logs/metrics artifacts: **no passwords**, **no raw webhook URLs**, **no vendor keys** — metadata is intentionally redacted.
+Exports under **`artifacts/calibration/`** are **immutable review bundles**. Metadata must not contain passwords, raw DSNs, or tokens.

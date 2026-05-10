@@ -40,7 +40,7 @@
           "refId": "A"
         }
       ],
-      "title": "Calibration confidence banner (Phase 13)",
+      "title": "Calibration confidence banner",
       "type": "table"
     },
     {
@@ -2347,8 +2347,7 @@
     "phase9",
     "phase10",
     "phase11",
-    "phase12",
-    "phase13"
+    "phase12"
   ],
   "templating": {
     "list": []
@@ -2359,7 +2358,7 @@
   },
   "timepicker": {},
   "timezone": "browser",
-  "title": "Wildfire Smoke Risk (Phase 3\u201312 ops)",
+  "title": "Wildfire Smoke Risk (operations)",
   "uid": "wildfire-smoke-phase2",
   "version": 6,
   "weekStart": ""
