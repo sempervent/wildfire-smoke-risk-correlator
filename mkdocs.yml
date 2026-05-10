@@ -1,0 +1,87 @@
+site_name: Wildfire Smoke Risk Correlator
+site_description: >-
+  Kafka + Spark + PostGIS pipeline for engineering smoke-risk correlation from open data.
+  Not a public-health advisory or regulatory dispersion model.
+site_url: https://sempervent.github.io/wildfire-smoke-risk-correlator/
+repo_url: https://github.com/sempervent/wildfire-smoke-risk-correlator
+repo_name: wildfire-smoke-risk-correlator
+edit_uri: edit/main/docs/
+
+# Omit legacy / checklist pages and operator runbooks from the published nav (sources remain in-repo).
+exclude_docs: |
+  architecture/system-overview.md
+  release/v0.1.0.md
+  release/v1.0.0-checklist.md
+  runbooks/*.md
+
+theme:
+  name: material
+  palette:
+    - scheme: default
+      primary: indigo
+      toggle:
+        icon: material/brightness-7
+        name: Switch to dark mode
+    - scheme: slate
+      primary: indigo
+      toggle:
+        icon: material/brightness-4
+        name: Switch to light mode
+  features:
+    - navigation.tabs
+    - navigation.sections
+    - content.code.copy
+    - search.suggest
+
+plugins:
+  - search
+
+markdown_extensions:
+  - admonition
+  - pymdownx.details
+  - pymdownx.superfences:
+      custom_fences:
+        - name: mermaid
+          class: mermaid
+          format: !!python/name:pymdownx.superfences.fence_div_format
+  - pymdownx.tabbed:
+      alternate_style: true
+  - tables
+  - toc:
+      permalink: true
+
+extra_javascript:
+  - https://unpkg.com/mermaid@10/dist/mermaid.min.js
+
+nav:
+  - Home: index.md
+  - Getting started: getting-started.md
+  - Architecture:
+      - Overview: architecture/overview.md
+      - Data flow: architecture/dataflow.md
+      - Data model: architecture/data-model.md
+      - Operational model: architecture/operational-model.md
+  - User guide:
+      - No-secrets demo: user-guide/no-secrets-demo.md
+      - Live ingest: user-guide/live-ingest.md
+      - Dashboards: user-guide/dashboards.md
+      - Calibration and evaluation: user-guide/calibration.md
+      - Alerting and notifications: user-guide/alerting.md
+      - DLQ and replay: user-guide/dlq-and-replay.md
+      - Exports: user-guide/exports.md
+  - Operations:
+      - Database bootstrap: operations/db-bootstrap.md
+      - Database doctor: operations/db-doctor.md
+      - Release check: operations/release-check.md
+      - Troubleshooting: operations/troubleshooting.md
+  - Reference:
+      - Make targets: reference/make-targets.md
+      - Environment: reference/environment.md
+      - Data sources: reference/data-sources.md
+      - Tables and views: reference/tables-and-views.md
+      - Risk models: reference/risk-models.md
+      - Limitations: reference/limitations.md
+  - Release notes:
+      - v1.1.0: release/v1.1.0.md
+      - v1.0.1: release/v1.0.1.md
+      - v1.0.0: release/v1.0.0.md

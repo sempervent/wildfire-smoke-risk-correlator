@@ -1,9 +1,18 @@
 COMPOSE ?= docker compose
 
-.PHONY: up down reset db-bootstrap db-bootstrap-minimal topics ingest-once ingest-live-once normalize normalize-wind normalize-grid-weather match-fire-weather compute-plume compute-dispersion compare-dispersion-aq dispersion-demo load-risk-observation-fixtures calibration-summary calibration-demo smoke-transport-demo smoke-test dlq-smoke-test grid-weather-demo grid-weather-smoke-test integration-regression integration-smoke-test assert-integration-state evaluate-risk test deps quality-check replay-fixtures replay-grid-weather-fixtures replay-wind-fixtures replay-bad-fixtures replay-dlq parse-errors parse-errors-compact consumer-offsets collect-lag kafka-lag grafana-up refresh-mviews alerts-check alerts-materialize alerts-send alerts-send-digest alerts-send-retry operational-cycle operational-scheduler-up demo export-calibration export-calibration-csv export-calibration-parquet release-check version db-doctor repair-alert-function release-fresh-volume-test release-manifest
+.PHONY: up down reset db-bootstrap db-bootstrap-minimal topics ingest-once ingest-live-once normalize normalize-wind normalize-grid-weather match-fire-weather compute-plume compute-dispersion compare-dispersion-aq dispersion-demo load-risk-observation-fixtures calibration-summary calibration-demo smoke-transport-demo smoke-test dlq-smoke-test grid-weather-demo grid-weather-smoke-test integration-regression integration-smoke-test assert-integration-state evaluate-risk test deps quality-check replay-fixtures replay-grid-weather-fixtures replay-wind-fixtures replay-bad-fixtures replay-dlq parse-errors parse-errors-compact consumer-offsets collect-lag kafka-lag grafana-up refresh-mviews alerts-check alerts-materialize alerts-send alerts-send-digest alerts-send-retry operational-cycle operational-scheduler-up demo export-calibration export-calibration-csv export-calibration-parquet release-check version db-doctor repair-alert-function release-fresh-volume-test release-manifest docs docs-check docs-serve
 
 deps:
 	uv sync --extra dev
+
+docs:
+	uv run mkdocs build
+
+docs-check:
+	uv run mkdocs build --strict
+
+docs-serve:
+	uv run mkdocs serve -a 127.0.0.1:8000
 
 up:
 	$(COMPOSE) up -d --build postgres redpanda redpanda-console spark-master spark-worker

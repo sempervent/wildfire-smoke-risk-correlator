@@ -30,6 +30,9 @@ data/raw/fixtures/
 .vscode/
 .DS_Store
 
+# MkDocs
+site/
+
 # Spark / logs
 spark-warehouse/
 metastore_db/
