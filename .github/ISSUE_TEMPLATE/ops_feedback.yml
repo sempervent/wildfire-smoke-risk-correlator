@@ -1,0 +1,50 @@
+name: Ops / bug / data / calibration feedback
+description: Report operational bugs, data-source or ingestion failures, or calibration/model evaluation feedback (engineering scope — not health claims).
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Use this template for **operational** issues: crashes, CI, Compose/Postgres, ingestion/DLQ behavior, or **calibration scaffolding** feedback.
+        This project does **not** accept issues asking for validated public-health or regulatory dispersion conclusions.
+
+  - type: dropdown
+    id: category
+    attributes:
+      label: Category
+      options:
+        - Bug (crash, incorrect behavior, CI failure)
+        - Data source / ingestion failure (FIRMS, OpenAQ, NWS, Census load)
+        - Calibration / evaluation feedback (metrics, exports, Grafana, alerts)
+        - Documentation / release hygiene
+    validations:
+      required: true
+
+  - type: textarea
+    id: summary
+    attributes:
+      label: Summary
+      description: What happened vs what you expected?
+    validations:
+      required: true
+
+  - type: textarea
+    id: repro
+    attributes:
+      label: Reproduction / context
+      description: Commands, branch/commit, OS, Docker version, relevant env vars (no secrets).
+      placeholder: |
+        e.g. make db-doctor output, workflow link, COMPOSE_PROJECT_NAME, migration errors…
+
+  - type: textarea
+    id: logs
+    attributes:
+      label: Logs / SQL errors (sanitized)
+      description: Paste redacted logs or `psql` errors. Remove passwords, API keys, webhook URLs.
+
+  - type: checkboxes
+    id: claims
+    attributes:
+      label: Acknowledgement
+      options:
+        - label: I understand outputs are engineering correlations / evaluation scaffolding, not validated health or regulatory modeling.
+          required: true
