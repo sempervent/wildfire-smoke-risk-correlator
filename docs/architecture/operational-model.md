@@ -19,7 +19,7 @@
 ## Releases
 
 - **`make release-check`** is the maintainer gate before tagging; it assumes **Compose is available** for **`make smoke-test`** unless you adapt the environment.
-- **`CHANGELOG.md`** and **`docs/release/v0.1.0.md`** describe milestone scope — explicitly **not** scientific validation.
+- **`CHANGELOG.md`** and **`docs/release/v1.0.0.md`** describe milestone scope — explicitly **not** scientific validation or public-health proof.
 
 ## Immutable calibration snapshots
 

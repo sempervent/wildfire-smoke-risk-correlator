@@ -24,7 +24,9 @@ This repository implements a **Kafka + Spark + PostGIS** pipeline that correlate
 
 **Phase 12** adds **qualitative evidence labels** on dispersion–AQ comparisons (**`no_aq_data`**, **`insufficient_aq_data`**, **`possible_overprediction`**, …), **richer `risk_model_evaluations`** metrics (MAE/RMSE, optional correlation when ≥`RISK_EVAL_MIN_MATCH_COUNT`, heuristic precision/recall on high bands), **JSONL observation fixtures** + **`make load-risk-observation-fixtures`**, **`make calibration-summary`** / **`make calibration-demo`**, calibration **SQL views**, low-severity **calibration alert candidates** (`model_overprediction_possible`, …), Grafana tables, and **`STRICT_CALIBRATION_ASSERTS`** / **`LOAD_RISK_OBSERVATION_FIXTURES`** hooks — **not scientific validation**.
 
-**Phase 13** adds **GitHub Actions CI** (fast **`SMOKE_NO_COMPOSE=1`** smoke, no Census download), an **optional Compose integration workflow** (manual / weekly / PR label **`integration`**), **synthetic minimal census fixtures** + **`make db-bootstrap-minimal`**, **immutable calibration exports** (`make export-calibration*`), **`make release-check`** / **`make version`**, **`CHANGELOG.md`**, **`docs/release/v0.1.0.md`**, short **architecture notes**, and a Grafana **calibration confidence banner** — **still not scientific validation**.
+**Phase 13** adds **GitHub Actions CI** (fast **`SMOKE_NO_COMPOSE=1`** smoke, no Census download), an **optional Compose integration workflow** (manual / weekly / PR label **`integration`**), **synthetic minimal census fixtures** + **`make db-bootstrap-minimal`**, **immutable calibration exports** (`make export-calibration*`), **`make release-check`** / **`make version`**, **`CHANGELOG.md`**, **`docs/release/v1.0.0.md`**, short **architecture notes**, and a Grafana **calibration confidence banner** — **still not scientific validation**.
+
+**Phase 14** prepares **v1.0.0**: canonical **`analytics.fn_alert_candidates`** migration (**`013_phase14_canonical_alert_function.sql`**) applied **after** dependent views, **`make db-doctor`** drift checks, **`make repair-alert-function`** for legacy overload issues, **`make release-manifest`**, optional isolated **`make release-fresh-volume-test`**, optional **`uv sync --extra parquet`** for Parquet exports — framed as a **stable local/demo/research platform**, **not** public-health or regulatory validation.
 
 Wind direction uses the **meteorological convention** (*wind FROM*); modeled smoke transport uses the **opposite bearing** (see `src/wildfire_smoke/wind.py`).
 
@@ -510,7 +512,7 @@ This wipes the Postgres volume, recreates topics, re-downloads Census data for t
 
 - Apply **`sql/migrations/012_phase12_calibration_metrics.sql`** and **`sql/views/zzz_phase12_calibration_views.sql`**, then reapply **`sql/views/zzz_phase9_fn_alert_candidates.sql`** so alert arity matches Python (**23** threshold parameters including calibration slots).
 
-### Phase 13 — CI, minimal census, calibration exports, v0.1.0 prep
+### Phase 13 — CI, minimal census, calibration exports (v1.0.0 prep)
 
 **Continuous integration**
 
@@ -535,7 +537,25 @@ This wipes the Postgres volume, recreates topics, re-downloads Census data for t
 
 **Docs**
 
-- **`CHANGELOG.md`**, **`docs/release/v0.1.0.md`**, **`docs/architecture/{system-overview,dataflow,operational-model}.md`**.
+- **`CHANGELOG.md`**, **`docs/release/v1.0.0.md`**, **`docs/release/v1.0.0-checklist.md`**, **`docs/architecture/{system-overview,dataflow,operational-model}.md`**.
+
+### Phase 14 — v1.0.0 migration integrity & release tooling
+
+**Canonical alert function**
+
+- Migration **`sql/migrations/013_phase14_canonical_alert_function.sql`** drops **all** historic **`analytics.fn_alert_candidates`** overloads (via **`pg_proc`**), then installs the single **23-parameter** SQL function plus **`analytics.v_alert_candidates`**. It runs **last** in **`scripts/bootstrap_db.sh`** so Phase **10–12** views exist first.
+- Legacy dev volumes that hit **`fn_alert_candidates is not unique`**: run **`make repair-alert-function`** (refreshes Phase **10–12** views, then reapplies **013**).
+- Fresh **`docker compose` volumes**: initdb includes **`docker/postgres/initdb/78_phase14_canonical_alert_drop_stub.sql`** (safe no-op teardown stub); canonical DDL still comes from **`bootstrap_db.sh`**.
+
+**Operator commands**
+
+- **`make db-doctor`** — schemas/tables/views/select probes + overload/param checks (**`DB_DOCTOR_WARN_ONLY=1`** exits 0 while printing issues).
+- **`make release-manifest`** — writes **`artifacts/release/<version>/release-manifest.json`** (no secrets).
+- **`make release-fresh-volume-test`** — isolated Compose project (**`RELEASE_COMPOSE_PROJECT_NAME`** default **`wildfire-smoke-release-test`**), **`make db-bootstrap-minimal`** by default (**`FULL_CENSUS=1`** optional), then integration smoke + **`db-doctor`** + export dry-run + teardown unless **`KEEP_RELEASE_STACK=1`**.
+
+**Parquet exports**
+
+- **`uv sync --extra parquet`** then **`make export-calibration-parquet`** — CSV exports remain the baseline.
 
 ## Makefile targets
 
@@ -589,8 +609,12 @@ This wipes the Postgres volume, recreates topics, re-downloads Census data for t
 | `make smoke-test`   | Run `scripts/smoke_test.sh` (Compose-backed); use **`SMOKE_NO_COMPOSE=1`** for fast CI-style checks |
 | `make export-calibration` / `make export-calibration-csv` | Immutable calibration/evaluation CSV exports + **`metadata.json`** |
 | `make export-calibration-parquet` | Same as CSV export plus Parquet (**requires `pyarrow`**) |
-| `make release-check` | Maintainer gate — includes **`make smoke-test`** (Compose expected) |
+| `make release-check` | Maintainer gate — static checks + **`SMOKE_NO_COMPOSE=1`** smoke (`COMPOSE_INTEGRATION=1` / **`FULL_RELEASE_TEST=1`** optional) |
 | `make version` | Print package **`__version__`** + optional git metadata |
+| `make db-doctor` | Postgres structural / drift checks (Phase 14) |
+| `make repair-alert-function` | Refresh Phase **10–12** views + reapply migration **013** (overload repair) |
+| `make release-manifest` | Write **`artifacts/release/<version>/release-manifest.json`** |
+| `make release-fresh-volume-test` | Isolated Compose fresh-volume validation (**does not** wipe normal dev volumes) |
 | `make integration-regression` | Full no-secrets fixture path + **`assert-integration-state`** (optional **`RUN_BOOTSTRAP=1`**) |
 | `make integration-smoke-test` | Lightweight Phase 10 wiring checks (`scripts/integration_smoke_test.sh`) |
 | `make assert-integration-state` | **`scripts/assert_integration_state.sh`** — pipeline row-count assertions |

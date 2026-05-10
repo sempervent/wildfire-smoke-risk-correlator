@@ -51,6 +51,11 @@ This repository is a **local-first vertical slice** for correlating NASA FIRMS h
 - **Release artifacts honesty:** **`CHANGELOG.md`**, **`docs/release/*.md`**, and tagged milestones must **not** claim peer-reviewed scientific validation — describe **engineering scope** and **limitations** explicitly.
 - **Calibration exports:** **`artifacts/calibration/*`** bundles are **immutable review snapshots** for operators — not regulatory submissions; **`metadata.json`** must remain free of **passwords**, raw **DSN strings**, **API keys**, and **webhook secrets** (hosts are redacted away from localhost).
 - **Integration workflows:** Compose-backed jobs may stay **manual**, **scheduled**, and/or **label-gated** when too heavy for every PR — prefer fast static CI on pushes.
+- **Phase 14 alert function integrity:** never ship or tolerate **multiple `analytics.fn_alert_candidates` overloads** — maintain exactly **one** canonical **23-parameter** signature (migration **`013_phase14_canonical_alert_function.sql`**). Use **`make db-doctor`** to detect drift and **`make repair-alert-function`** on disposable/repairable volumes when overloads accumulate.
+- **Migration repair scripts** (`repair-alert-function`, **`bootstrap_db.sh`**) must remain **idempotent** and safe to re-run after partial failures.
+- **`make release-check`** and **`make release-manifest`** must stay **no-secrets** — manifests and CI logs never carry passwords, raw DSNs, API keys, or webhook tokens.
+- **Fresh-volume tests** (**`make release-fresh-volume-test`**) must target an **explicit isolated Compose project name** — never default to destroying an operator’s primary dev volumes.
+- **v1.0.0 documentation** frames the stack as a **local/demo/research platform** — do **not** claim **public-health validation**, **regulatory dispersion**, or **operational emergency guidance** without external governance.
 
 ## Operating constraints
 

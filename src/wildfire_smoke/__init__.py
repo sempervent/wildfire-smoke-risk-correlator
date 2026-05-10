@@ -7,6 +7,6 @@ try:
 
     __version__ = _pkg_version("wildfire-smoke-risk-correlator")
 except Exception:
-    __version__ = "0.1.0"
+    __version__ = "1.0.0"
 
 __all__ = ["__version__"]
