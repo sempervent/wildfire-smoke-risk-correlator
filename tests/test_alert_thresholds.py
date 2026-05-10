@@ -23,6 +23,9 @@ def test_alert_threshold_defaults(monkeypatch) -> None:
     monkeypatch.delenv("ALERT_GRID_WEATHER_STALE_HOURS", raising=False)
     monkeypatch.delenv("ALERT_FIRE_WEATHER_UNMATCHED_WARN_COUNT", raising=False)
     monkeypatch.delenv("ALERT_FIRE_WEATHER_UNMATCHED_CRITICAL_COUNT", raising=False)
+    monkeypatch.delenv("ALERT_HIGH_DISPERSION_EXPOSURE_MIN_SCORE", raising=False)
+    monkeypatch.delenv("ALERT_DISPERSION_NO_WIND_MATCHES_HOURS", raising=False)
+    monkeypatch.delenv("ALERT_DISPERSION_AQ_MISMATCH_MIN_SCORE", raising=False)
 
     t = alert_thresholds_from_env()
     assert t.freshness_warn_hours == 6
@@ -36,6 +39,9 @@ def test_alert_threshold_defaults(monkeypatch) -> None:
     assert t.grid_weather_stale_hours == 6
     assert t.fire_weather_unmatched_warn_count == 5
     assert t.fire_weather_unmatched_critical_count == 25
+    assert t.high_dispersion_exposure_min_score == 70.0
+    assert t.dispersion_no_wind_matches_hours == 24
+    assert t.dispersion_aq_mismatch_min_score == 50.0
 
 
 def test_alert_threshold_overrides(monkeypatch) -> None:

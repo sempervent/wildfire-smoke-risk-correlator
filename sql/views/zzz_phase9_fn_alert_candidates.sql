@@ -16,7 +16,10 @@ CREATE OR REPLACE FUNCTION analytics.fn_alert_candidates(
   p_dlq_depth_critical_messages bigint DEFAULT 100,
   p_grid_weather_stale_hours integer DEFAULT 6,
   p_fire_weather_unmatched_warn integer DEFAULT 5,
-  p_fire_weather_unmatched_critical integer DEFAULT 25
+  p_fire_weather_unmatched_critical integer DEFAULT 25,
+  p_high_dispersion_exposure_min double precision DEFAULT 70,
+  p_dispersion_no_wind_hours integer DEFAULT 24,
+  p_dispersion_aq_mismatch_min double precision DEFAULT 50
 )
 RETURNS TABLE (
   alert_type text,
@@ -717,6 +720,96 @@ AS $$
   WHERE ipc.fires_24h > 0
     AND ipc.grid_cells_24h > 0
     AND ipc.total_fire_weather_matches = 0
+
+  UNION ALL
+
+  SELECT
+    'high_dispersion_exposure'::text,
+    'warn'::text,
+    NULL::text,
+    NULL::text,
+    'Elevated Gaussian dispersion proxy score'::text,
+    format('max_dispersion_score_24h=%s', dos.max_dispersion_score_24h),
+    now(),
+    jsonb_build_object(
+      'max_dispersion_score_24h', dos.max_dispersion_score_24h,
+      'threshold', p_high_dispersion_exposure_min
+    )
+  FROM analytics.v_dispersion_operational_summary dos
+  WHERE dos.max_dispersion_score_24h >= p_high_dispersion_exposure_min
+
+  UNION ALL
+
+  SELECT
+    'dispersion_no_wind_matches'::text,
+    'warn'::text,
+    NULL::text,
+    NULL::text,
+    'Recent fires lack dispersion rows despite grid-wind matches'::text,
+    format('unmatched_fire_count=%s lookback_hours=%s', gap.cnt, p_dispersion_no_wind_hours),
+    now(),
+    jsonb_build_object(
+      'unmatched_fire_count', gap.cnt,
+      'lookback_hours', p_dispersion_no_wind_hours,
+      'hint', 'Run compute-dispersion with DISPERSION_ENABLED=1'
+    )
+  FROM (
+    SELECT COUNT(*)::bigint AS cnt
+    FROM normalized.fire_detections f
+    WHERE f.acq_datetime >= now() - interval '24 hours'
+      AND EXISTS (SELECT 1 FROM analytics.fire_weather_matches m WHERE m.detection_id = f.detection_id)
+      AND NOT EXISTS (
+        SELECT 1 FROM analytics.smoke_dispersion_exposures e
+        WHERE e.detection_id = f.detection_id
+          AND e.computed_at >= now() - (p_dispersion_no_wind_hours || ' hours')::interval
+      )
+  ) gap
+  WHERE gap.cnt >= 3
+
+  UNION ALL
+
+  SELECT
+    'dispersion_no_targets'::text,
+    'warn'::text,
+    NULL::text,
+    NULL::text,
+    'Dispersion rows present but no positive scores recently'::text,
+    format(
+      'dispersion_rows_24h=%s dispersion_positive_scores_24h=%s fires_24h=%s',
+      dos.dispersion_rows_24h,
+      dos.dispersion_positive_scores_24h,
+      dos.fires_24h
+    ),
+    now(),
+    jsonb_build_object(
+      'dispersion_rows_24h', dos.dispersion_rows_24h,
+      'dispersion_positive_scores_24h', dos.dispersion_positive_scores_24h,
+      'fires_24h', dos.fires_24h
+    )
+  FROM analytics.v_dispersion_operational_summary dos
+  WHERE dos.dispersion_rows_24h > 0
+    AND dos.dispersion_positive_scores_24h = 0
+    AND dos.fires_24h > 0
+
+  UNION ALL
+
+  SELECT
+    'dispersion_aq_mismatch_high'::text,
+    'warn'::text,
+    NULL::text,
+    NULL::text,
+    'Dispersion vs AQ lag comparison divergence'::text,
+    format('high_mismatch_rows=%s', mx.cnt),
+    now(),
+    jsonb_build_object('high_mismatch_rows', mx.cnt, 'threshold', p_dispersion_aq_mismatch_min)
+  FROM (
+    SELECT COUNT(*)::bigint AS cnt
+    FROM analytics.dispersion_aq_comparisons c
+    WHERE c.comparison_score >= p_dispersion_aq_mismatch_min
+      AND c.aq_observation_count >= 2
+      AND c.computed_at >= (now() - interval '48 hours')
+  ) mx
+  WHERE mx.cnt >= 1
 $$;
 
 CREATE OR REPLACE VIEW analytics.v_alert_candidates AS
@@ -738,7 +831,10 @@ FROM analytics.fn_alert_candidates(
   100::bigint,
   6,
   5,
-  25
+  25,
+  70::double precision,
+  24,
+  50::double precision
 );
 
 COMMENT ON VIEW analytics.v_alert_candidates IS

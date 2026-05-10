@@ -40,6 +40,11 @@ def stable_fingerprint_details(alert_type: str, details: dict[str, Any]) -> dict
             "model_version": details.get("model_version"),
             "max_exposure_score": details.get("max_exposure_score"),
         }
+    if alert_type == "high_dispersion_exposure":
+        return {
+            "max_dispersion_score_24h": details.get("max_dispersion_score_24h"),
+            "threshold": details.get("threshold"),
+        }
     if alert_type in {"no_recent_wind_data"}:
         return {}
     if alert_type in {
@@ -57,6 +62,10 @@ def stable_fingerprint_details(alert_type: str, details: dict[str, Any]) -> dict
         "integration_pipeline_incomplete",
         "v4_risk_missing",
         "fire_weather_match_missing",
+        "high_dispersion_exposure",
+        "dispersion_no_wind_matches",
+        "dispersion_no_targets",
+        "dispersion_aq_mismatch_high",
     }:
         return {}
     return {}
@@ -92,6 +101,10 @@ def fingerprint_for_candidate(
             "integration_pipeline_incomplete",
             "v4_risk_missing",
             "fire_weather_match_missing",
+            "high_dispersion_exposure",
+            "dispersion_no_wind_matches",
+            "dispersion_no_targets",
+            "dispersion_aq_mismatch_high",
         }
         else title
     )
@@ -116,7 +129,8 @@ def fetch_candidates(conn: psycopg.Connection) -> list[tuple[Any, ...]]:
             FROM analytics.fn_alert_candidates(
               %s, %s, %s::double precision, %s, %s::double precision, %s, %s, %s,
               %s, %s, %s::bigint, %s::bigint, %s::bigint, %s::bigint,
-              %s, %s, %s
+              %s, %s, %s,
+              %s::double precision, %s, %s::double precision
             )
             """,
             (
@@ -137,6 +151,9 @@ def fetch_candidates(conn: psycopg.Connection) -> list[tuple[Any, ...]]:
                 thr.grid_weather_stale_hours,
                 thr.fire_weather_unmatched_warn_count,
                 thr.fire_weather_unmatched_critical_count,
+                thr.high_dispersion_exposure_min_score,
+                thr.dispersion_no_wind_matches_hours,
+                thr.dispersion_aq_mismatch_min_score,
             ),
         )
         return list(cur.fetchall())

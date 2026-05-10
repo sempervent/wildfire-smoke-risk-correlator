@@ -32,3 +32,5 @@ def test_phase9_migrations_initdb_views_and_alert_fn_exist() -> None:
     assert "integration_pipeline_incomplete" in alerts_txt
     assert "v4_risk_missing" in alerts_txt
     assert "fire_weather_match_missing" in alerts_txt
+    assert "high_dispersion_exposure" in alerts_txt
+    assert "dispersion_no_wind_matches" in alerts_txt

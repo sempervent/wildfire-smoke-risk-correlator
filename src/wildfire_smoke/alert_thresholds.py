@@ -43,6 +43,9 @@ class AlertThresholds:
     grid_weather_stale_hours: int
     fire_weather_unmatched_warn_count: int
     fire_weather_unmatched_critical_count: int
+    high_dispersion_exposure_min_score: float
+    dispersion_no_wind_matches_hours: int
+    dispersion_aq_mismatch_min_score: float
 
 
 def alert_thresholds_from_env() -> AlertThresholds:
@@ -67,5 +70,14 @@ def alert_thresholds_from_env() -> AlertThresholds:
         ),
         fire_weather_unmatched_critical_count=_positive_int(
             os.environ.get("ALERT_FIRE_WEATHER_UNMATCHED_CRITICAL_COUNT"), 25
+        ),
+        high_dispersion_exposure_min_score=_positive_float(
+            os.environ.get("ALERT_HIGH_DISPERSION_EXPOSURE_MIN_SCORE"), 70.0
+        ),
+        dispersion_no_wind_matches_hours=_positive_int(
+            os.environ.get("ALERT_DISPERSION_NO_WIND_MATCHES_HOURS"), 24
+        ),
+        dispersion_aq_mismatch_min_score=_positive_float(
+            os.environ.get("ALERT_DISPERSION_AQ_MISMATCH_MIN_SCORE"), 50.0
         ),
     )

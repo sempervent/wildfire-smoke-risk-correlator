@@ -12,6 +12,7 @@ def test_normalize_warn_vs_high_smoke() -> None:
 
 def test_normalize_warn_vs_high_plume() -> None:
     assert normalize_db_severity("high_plume_exposure", "warn") == "high"
+    assert normalize_db_severity("high_dispersion_exposure", "warn") == "high"
 
 
 def test_normalize_generic_warn_is_warning() -> None:

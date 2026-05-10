@@ -69,3 +69,15 @@ mappings:
   fire_weather_match_missing:
     slug: fire-weather-match-missing
     path: docs/runbooks/fire-weather-match-missing.md
+  high_dispersion_exposure:
+    slug: high-dispersion-exposure
+    path: docs/runbooks/high-dispersion-exposure.md
+  dispersion_no_wind_matches:
+    slug: dispersion-no-wind-matches
+    path: docs/runbooks/dispersion-no-wind-matches.md
+  dispersion_no_targets:
+    slug: dispersion-no-targets
+    path: docs/runbooks/dispersion-no-targets.md
+  dispersion_aq_mismatch_high:
+    slug: dispersion-aq-mismatch-high
+    path: docs/runbooks/dispersion-aq-mismatch-high.md
