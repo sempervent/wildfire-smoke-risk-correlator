@@ -46,6 +46,11 @@ This repository is a **local-first vertical slice** for correlating NASA FIRMS h
 - **Correlation gate:** do **not** treat Pearson **`correlation`** in **`risk_model_evaluations`** as meaningful when **`match_count`** is below **`RISK_EVAL_MIN_MATCH_COUNT`** (default **3**) or when variance collapses — the job omits **`correlation`** in those cases.
 - **Calibration alerts stay soft:** default **`ALERT_CALIBRATION_WARN_ONLY=1`** maps SQL severities toward **`info`** — do not escalate calibration mismatch alerts to paging without explicit ops configuration.
 - **Fixture observations:** JSONL under **`tests/fixtures/`** used by **`make load-risk-observation-fixtures`** must stay **deterministic and secret-free** (proxy labels only).
+- **Phase 13 CI hygiene:** default **GitHub Actions PR CI** must stay **no secrets**, **no live vendor APIs**, and **must not download Census** — use **`SMOKE_NO_COMPOSE=1`** / unit tests instead of full **`make smoke-test`** there.
+- **Census in CI:** never rely on **TIGER downloads** in PR CI; use **`make db-bootstrap-minimal`** + synthetic **`tests/fixtures/census_minimal_*.geojson`** only for optional integration workflows.
+- **Release artifacts honesty:** **`CHANGELOG.md`**, **`docs/release/*.md`**, and tagged milestones must **not** claim peer-reviewed scientific validation — describe **engineering scope** and **limitations** explicitly.
+- **Calibration exports:** **`artifacts/calibration/*`** bundles are **immutable review snapshots** for operators — not regulatory submissions; **`metadata.json`** must remain free of **passwords**, raw **DSN strings**, **API keys**, and **webhook secrets** (hosts are redacted away from localhost).
+- **Integration workflows:** Compose-backed jobs may stay **manual**, **scheduled**, and/or **label-gated** when too heavy for every PR — prefer fast static CI on pushes.
 
 ## Operating constraints
 

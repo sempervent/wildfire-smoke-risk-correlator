@@ -24,6 +24,8 @@ This repository implements a **Kafka + Spark + PostGIS** pipeline that correlate
 
 **Phase 12** adds **qualitative evidence labels** on dispersion–AQ comparisons (**`no_aq_data`**, **`insufficient_aq_data`**, **`possible_overprediction`**, …), **richer `risk_model_evaluations`** metrics (MAE/RMSE, optional correlation when ≥`RISK_EVAL_MIN_MATCH_COUNT`, heuristic precision/recall on high bands), **JSONL observation fixtures** + **`make load-risk-observation-fixtures`**, **`make calibration-summary`** / **`make calibration-demo`**, calibration **SQL views**, low-severity **calibration alert candidates** (`model_overprediction_possible`, …), Grafana tables, and **`STRICT_CALIBRATION_ASSERTS`** / **`LOAD_RISK_OBSERVATION_FIXTURES`** hooks — **not scientific validation**.
 
+**Phase 13** adds **GitHub Actions CI** (fast **`SMOKE_NO_COMPOSE=1`** smoke, no Census download), an **optional Compose integration workflow** (manual / weekly / PR label **`integration`**), **synthetic minimal census fixtures** + **`make db-bootstrap-minimal`**, **immutable calibration exports** (`make export-calibration*`), **`make release-check`** / **`make version`**, **`CHANGELOG.md`**, **`docs/release/v0.1.0.md`**, short **architecture notes**, and a Grafana **calibration confidence banner** — **still not scientific validation**.
+
 Wind direction uses the **meteorological convention** (*wind FROM*); modeled smoke transport uses the **opposite bearing** (see `src/wildfire_smoke/wind.py`).
 
 **Important:** the risk score is a **demonstration / operations correlation index**, not a health advisory model.
@@ -508,6 +510,33 @@ This wipes the Postgres volume, recreates topics, re-downloads Census data for t
 
 - Apply **`sql/migrations/012_phase12_calibration_metrics.sql`** and **`sql/views/zzz_phase12_calibration_views.sql`**, then reapply **`sql/views/zzz_phase9_fn_alert_candidates.sql`** so alert arity matches Python (**23** threshold parameters including calibration slots).
 
+### Phase 13 — CI, minimal census, calibration exports, v0.1.0 prep
+
+**Continuous integration**
+
+- **`.github/workflows/ci.yml`** — on **`pull_request`** and pushes to **`main`**: **`uv`** + **ruff** + **pytest**, **`bash -n scripts/*.sh`**, **`SMOKE_NO_COMPOSE=1`** smoke (no Compose / API keys / Census), Grafana JSON **`python3 -m json.tool`** check.
+- **`.github/workflows/integration.yml`** — **`workflow_dispatch`**, weekly schedule, or PRs labeled **`integration`**: Compose Postgres + Redpanda + Spark → **`make db-bootstrap-minimal`** → **`make topics`** → **`make integration-smoke-test`** (optional regression flag file documented in the workflow).
+
+**Minimal census (CI / integration only)**
+
+- Fixtures: **`tests/fixtures/census_minimal_counties.geojson`**, **`tests/fixtures/census_minimal_tracts.geojson`** — **synthetic boxes**, **not** real TIGER boundaries.
+- **`make db-bootstrap-minimal`** runs **`scripts/load_minimal_census_fixtures.sh`** (Python **`wildfire_smoke.load_minimal_census`**) then **`scripts/bootstrap_db.sh`**. Refuses to overwrite populated **`geo.counties`** unless **`MINIMAL_CENSUS_REPLACE_ALL=1`** (destructive; intended for disposable CI DBs).
+
+**Calibration exports**
+
+- **`make export-calibration`** / **`make export-calibration-csv`** — CSV snapshots of calibration/evaluation views under **`artifacts/calibration/<YYYYMMDDTHHMMSSZ>/`** plus **`metadata.json`** (redacted DB host, row counts, git/package hints when available).
+- **`make export-calibration-parquet`** — same plus **`.parquet`** files when **`pyarrow`** is installed; otherwise fails with a clear **RuntimeError**.
+- **`CALIBRATION_EXPORT_DRY_RUN=1`** writes a stub **`metadata.json`** without querying views (used by **`SMOKE_NO_COMPOSE`** smoke).
+
+**Release gate**
+
+- **`make release-check`** runs **`scripts/release_check.sh`** (lint, tests, dashboard JSON, **`bash -n`**, doc/env/runbook guards, **`make smoke-test`**, and **`make integration-smoke-test`** only when **`COMPOSE_INTEGRATION=1`**).
+- **`make version`** prints **`wildfire_smoke.__version__`** and optional git commit/branch/dirty state.
+
+**Docs**
+
+- **`CHANGELOG.md`**, **`docs/release/v0.1.0.md`**, **`docs/architecture/{system-overview,dataflow,operational-model}.md`**.
+
 ## Makefile targets
 
 | Target          | Purpose                                              |
@@ -518,6 +547,7 @@ This wipes the Postgres volume, recreates topics, re-downloads Census data for t
 | `make reset`    | Full local wipe + rebuild + census bootstrap         |
 | `make topics`   | Create required Kafka topics                         |
 | `make db-bootstrap` | Download/load Census + apply SQL views         |
+| `make db-bootstrap-minimal` | Load **synthetic** minimal county/tract GeoJSON + apply migrations/views (**CI/test**; see **`MINIMAL_CENSUS_REPLACE_ALL`**) |
 | `make ingest-once`  | Run FIRMS + OpenAQ + wind producers once           |
 | `make normalize`    | Run Spark normalization jobs (FIRMS + OpenAQ + wind) |
 | `make normalize-wind` | Spark-normalize **`weather.wind.raw`** only       |
@@ -556,7 +586,11 @@ This wipes the Postgres volume, recreates topics, re-downloads Census data for t
 | `make operational-cycle` | Fixture replay **or** live ingest + batch jobs |
 | `make operational-scheduler-up` | Start Compose **`scheduler`** profile loop |
 | `make demo`           | No-secrets local demo (`replay-fixtures` path)   |
-| `make smoke-test`   | Run `scripts/smoke_test.sh` (optional **`GRID_WEATHER_SMOKE=1`**)                      |
+| `make smoke-test`   | Run `scripts/smoke_test.sh` (Compose-backed); use **`SMOKE_NO_COMPOSE=1`** for fast CI-style checks |
+| `make export-calibration` / `make export-calibration-csv` | Immutable calibration/evaluation CSV exports + **`metadata.json`** |
+| `make export-calibration-parquet` | Same as CSV export plus Parquet (**requires `pyarrow`**) |
+| `make release-check` | Maintainer gate — includes **`make smoke-test`** (Compose expected) |
+| `make version` | Print package **`__version__`** + optional git metadata |
 | `make integration-regression` | Full no-secrets fixture path + **`assert-integration-state`** (optional **`RUN_BOOTSTRAP=1`**) |
 | `make integration-smoke-test` | Lightweight Phase 10 wiring checks (`scripts/integration_smoke_test.sh`) |
 | `make assert-integration-state` | **`scripts/assert_integration_state.sh`** — pipeline row-count assertions |
