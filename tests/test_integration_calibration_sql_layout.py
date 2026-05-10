@@ -3,7 +3,7 @@ from __future__ import annotations
 from wildfire_smoke.settings import repo_root
 
 
-def test_phase10_calibration_migration_and_views_exist() -> None:
+def test_integration_calibration_migration_and_views_exist() -> None:
     root = repo_root()
     m10 = root / "sql/migrations/010_phase10_calibration.sql"
     i75 = root / "docker/postgres/initdb/75_phase10_calibration.sql"

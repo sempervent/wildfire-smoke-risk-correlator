@@ -3,7 +3,7 @@ from __future__ import annotations
 from wildfire_smoke.settings import repo_root
 
 
-def test_phase9_migrations_initdb_views_and_alert_fn_exist() -> None:
+def test_grid_weather_migrations_initdb_views_and_alert_fn_exist() -> None:
     root = repo_root()
     m9 = root / "sql/migrations/009_phase9_gridded_weather.sql"
     i74 = root / "docker/postgres/initdb/74_phase9_gridded_weather.sql"

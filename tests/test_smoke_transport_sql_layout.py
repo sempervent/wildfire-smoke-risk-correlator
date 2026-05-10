@@ -3,7 +3,7 @@ from __future__ import annotations
 from wildfire_smoke.settings import repo_root
 
 
-def test_phase6_migrations_and_initdb_exist() -> None:
+def test_smoke_transport_migrations_and_initdb_exist() -> None:
     root = repo_root()
     m5 = root / "sql/migrations/005_phase6_wind_observations.sql"
     m6 = root / "sql/migrations/006_phase6_smoke_plume_exposures.sql"

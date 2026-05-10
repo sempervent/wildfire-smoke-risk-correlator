@@ -3,7 +3,7 @@ from __future__ import annotations
 from wildfire_smoke.settings import repo_root
 
 
-def test_phase5_migration_defines_attempts_and_ops_views() -> None:
+def test_notification_reliability_migration_defines_attempts_and_ops_views() -> None:
     mig = repo_root() / "sql/migrations/004_phase5_notification_reliability.sql"
     init = repo_root() / "docker/postgres/initdb/60_phase5.sql"
     assert mig.is_file()

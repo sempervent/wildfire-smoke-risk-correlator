@@ -24,12 +24,12 @@ def test_migration_013_drops_fn_overloads_then_defines_canonical() -> None:
     assert "CREATE OR REPLACE VIEW analytics.v_alert_candidates" in txt
 
 
-def test_phase9_view_stub_points_at_migration() -> None:
+def test_grid_weather_fn_stub_points_at_canonical_migration() -> None:
     stub = (repo_root() / "sql/views/zzz_phase9_fn_alert_candidates.sql").read_text(encoding="utf-8")
     assert "013_phase14_canonical_alert_function.sql" in stub
 
 
-def test_initdb_phase14_stub_exists() -> None:
+def test_initdb_canonical_alert_drop_stub_exists() -> None:
     p = repo_root() / "docker/postgres/initdb/78_phase14_canonical_alert_drop_stub.sql"
     assert p.is_file()
     assert "DROP FUNCTION IF EXISTS analytics.fn_alert_candidates" in p.read_text(encoding="utf-8")
@@ -94,7 +94,7 @@ def test_compose_repair_and_fresh_volume_scripts_shell_syntax() -> None:
         subprocess.run(["bash", "-n", str(root / "scripts" / name)], check=True)
 
 
-def test_bootstrap_skips_phase14_until_last() -> None:
+def test_bootstrap_applies_canonical_alert_migration_last() -> None:
     txt = (repo_root() / "scripts/bootstrap_db.sh").read_text(encoding="utf-8")
     assert "PHASE14_MIGRATION_BASENAME" in txt
     assert "Applying ${PHASE14_MIGRATION_BASENAME} last" in txt

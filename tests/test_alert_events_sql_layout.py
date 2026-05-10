@@ -3,7 +3,7 @@ from __future__ import annotations
 from wildfire_smoke.settings import repo_root
 
 
-def test_phase4_migration_defines_alert_events() -> None:
+def test_alert_events_migration_defines_alert_events_table() -> None:
     mig = repo_root() / "sql/migrations/003_phase4_alerts.sql"
     init = repo_root() / "docker/postgres/initdb/50_phase4.sql"
     assert mig.is_file()

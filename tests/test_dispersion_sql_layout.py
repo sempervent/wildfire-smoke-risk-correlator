@@ -3,7 +3,7 @@ from __future__ import annotations
 from wildfire_smoke.settings import repo_root
 
 
-def test_phase11_migration_initdb_views_exist() -> None:
+def test_dispersion_migration_initdb_views_exist() -> None:
     root = repo_root()
     m11 = root / "sql/migrations/011_phase11_dispersion.sql"
     i76 = root / "docker/postgres/initdb/76_phase11_dispersion.sql"
@@ -21,7 +21,7 @@ def test_phase11_migration_initdb_views_exist() -> None:
     assert "v_latest_smoke_risk_v5" in views_txt
 
 
-def test_phase9_fn_lists_dispersion_alert_types() -> None:
+def test_canonical_alert_fn_lists_dispersion_alert_types() -> None:
     fn_path = repo_root() / "sql/migrations/013_phase14_canonical_alert_function.sql"
     txt = fn_path.read_text()
     assert "p_high_dispersion_exposure_min" in txt

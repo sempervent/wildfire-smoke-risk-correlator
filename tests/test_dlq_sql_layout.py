@@ -3,7 +3,7 @@ from __future__ import annotations
 from wildfire_smoke.settings import repo_root
 
 
-def test_phase7_migrations_initdb_views_and_alerts_exist() -> None:
+def test_dlq_migrations_initdb_views_and_alerts_exist() -> None:
     root = repo_root()
     m7 = root / "sql/migrations/007_phase7_dlq_and_offsets.sql"
     i72 = root / "docker/postgres/initdb/72_phase7_dlq_offsets.sql"

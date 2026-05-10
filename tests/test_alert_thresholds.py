@@ -58,7 +58,7 @@ def test_alert_threshold_overrides(monkeypatch) -> None:
     assert t.high_risk_min_score == 70.0
 
 
-def test_alert_threshold_phase8_overrides(monkeypatch) -> None:
+def test_alert_threshold_operational_lag_overrides(monkeypatch) -> None:
     monkeypatch.setenv("ALERT_PARSER_SPIKE_WARN_COUNT", "9")
     monkeypatch.setenv("ALERT_PARSER_SPIKE_CRITICAL_COUNT", "33")
     monkeypatch.setenv("ALERT_KAFKA_LAG_WARN_MESSAGES", "50")
@@ -74,7 +74,7 @@ def test_alert_threshold_phase8_overrides(monkeypatch) -> None:
     assert t.dlq_depth_critical_messages == 80
 
 
-def test_alert_threshold_phase9_overrides(monkeypatch) -> None:
+def test_alert_threshold_grid_weather_overrides(monkeypatch) -> None:
     monkeypatch.setenv("ALERT_GRID_WEATHER_STALE_HOURS", "12")
     monkeypatch.setenv("ALERT_FIRE_WEATHER_UNMATCHED_WARN_COUNT", "7")
     monkeypatch.setenv("ALERT_FIRE_WEATHER_UNMATCHED_CRITICAL_COUNT", "40")

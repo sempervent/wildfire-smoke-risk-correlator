@@ -3,7 +3,7 @@ from __future__ import annotations
 from wildfire_smoke.settings import repo_root
 
 
-def test_phase12_migration_initdb_views_exist() -> None:
+def test_calibration_migration_initdb_views_exist() -> None:
     root = repo_root()
     m12 = root / "sql/migrations/012_phase12_calibration_metrics.sql"
     i77 = root / "docker/postgres/initdb/77_phase12_calibration_metrics.sql"
@@ -31,7 +31,7 @@ def test_phase12_migration_initdb_views_exist() -> None:
         assert name in views_txt
 
 
-def test_phase9_fn_lists_calibration_alert_types() -> None:
+def test_canonical_alert_fn_lists_calibration_alert_types() -> None:
     fn_path = repo_root() / "sql/migrations/013_phase14_canonical_alert_function.sql"
     txt = fn_path.read_text()
     assert "p_model_mismatch_min_count" in txt

@@ -3,7 +3,7 @@ from __future__ import annotations
 from wildfire_smoke.settings import repo_root
 
 
-def test_phase8_migrations_initdb_views_and_alert_fn_exist() -> None:
+def test_operational_lag_migrations_initdb_views_and_alert_fn_exist() -> None:
     root = repo_root()
     m8 = root / "sql/migrations/008_phase8_operational_lag.sql"
     i73 = root / "docker/postgres/initdb/73_phase8_operational_lag.sql"

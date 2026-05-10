@@ -3,7 +3,7 @@ from __future__ import annotations
 from wildfire_smoke.settings import repo_root
 
 
-def test_phase3_sql_files_exist_and_reference_views() -> None:
+def test_maps_and_slis_sql_files_exist_and_reference_views() -> None:
     root = repo_root()
     alerts = root / "sql/views/zzz_phase3_alerts_sli.sql"
     geo = root / "sql/views/zzz_phase3_geojson_views.sql"
