@@ -2,6 +2,24 @@
 
 All notable changes to this project are documented here. Releases are **engineering milestones** — they do **not** imply scientific validation of smoke-risk outputs.
 
+## [1.1.0] — 2026-05-10
+
+### Added
+
+- **MkDocs** documentation site (**Material** theme) under **`docs/`** with task-oriented sections (getting started, user guide, operations, reference).
+- **GitHub Pages** workflow **`.github/workflows/docs.yml`** (deploy on **`main`** + **`workflow_dispatch`**).
+- **CI docs gate:** **`make docs-check`** (**`mkdocs build --strict`**) in **`release-check`** and **`.github/workflows/ci.yml`**.
+- **`docs/release/v1.1.0.md`** release notes for documentation restructuring.
+
+### Changed
+
+- **README.md** rewritten as a concise project front door; detailed material moved into MkDocs pages.
+- **Package version → 1.1.0**.
+
+### Notes
+
+- **No** changes to risk scoring formulas, core Spark/Python pipeline behavior, or default data sources beyond documentation and validation hooks.
+
 ## [1.0.1] — 2026-05-10
 
 ### Added
