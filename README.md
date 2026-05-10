@@ -537,9 +537,9 @@ This wipes the Postgres volume, recreates topics, re-downloads Census data for t
 
 **Docs**
 
-- **`CHANGELOG.md`**, **`docs/release/v1.0.0.md`**, **`docs/release/v1.0.0-checklist.md`**, **`docs/architecture/{system-overview,dataflow,operational-model}.md`**.
+- **`CHANGELOG.md`**, **`docs/release/v1.0.0.md`**, **`docs/release/v1.0.1.md`**, **`docs/release/v1.0.0-checklist.md`**, **`docs/architecture/{system-overview,dataflow,operational-model}.md`**.
 
-### Phase 14 — v1.0.0 migration integrity & release tooling
+### Phase 14 — migration integrity & release tooling (v1.0.x)
 
 **Canonical alert function**
 
@@ -556,6 +556,11 @@ This wipes the Postgres volume, recreates topics, re-downloads Census data for t
 **Parquet exports**
 
 - **`uv sync --extra parquet`** then **`make export-calibration-parquet`** — CSV exports remain the baseline.
+
+**Integration CI (Compose)**
+
+- **`.github/workflows/integration.yml`** runs on **`workflow_dispatch`**, weekly **`schedule`**, or PR label **`integration`**. Scheduled/manual runs also execute **`scripts/release_check.sh`** with **`COMPOSE_INTEGRATION=1`** after **`make integration-smoke-test`**, and upload an optional **`calibration-export-*`** artifact (CSV + **`metadata.json`** under **`artifacts/calibration-ci/`**, best-effort).
+- **Self-hosted runners:** GitHub-hosted **`ubuntu-latest`** works for the default slice; for heavier queue/runtime, register a **[self-hosted runner](https://docs.github.com/en/actions/hosting-your-own-runners/managing-self-hosted-runners/about-self-hosted-runners)** and change the workflow’s **`runs-on`** line to e.g. **`[self-hosted, linux]`** (commented guidance lives in the YAML header).
 
 ## Makefile targets
 
@@ -733,7 +738,34 @@ This remains an **engineering correlation** experiment — **not** dispersion mo
 
 ## Troubleshooting
 
-- **Spark normalization / JDBC**: executor containers need **`PSYCOPG_CONNINFO`** (or JDBC URL + credentials) and **`KAFKA_BOOTSTRAP_SERVERS`**—see `scripts/run_normalize.sh`. The smoke-risk job uses the same Spark image but runs **`python3`** with psycopg only (`scripts/run_compute_risk.sh`).
+### Postgres alert function drift (`fn_alert_candidates`)
+
+If **`psql`** / Grafana / **`materialize_alerts`** fails with **`function analytics.fn_alert_candidates(...) is not unique`**, legacy volumes may hold multiple overloads. Apply **`make repair-alert-function`** (after backups if needed), then **`make db-doctor`**. See **`docs/release/v1.0.1.md`** for the full sequence.
+
+### `make db-doctor` (structural checks)
+
+With Compose up and migrations applied, **`make db-doctor`** prints a fixed-width table and exits **non-zero** on drift (unless **`DB_DOCTOR_WARN_ONLY=1`**). Healthy output resembles:
+
+```text
+check                                                ok     detail
+--------------------------------------------------------------------
+postgres_reachable                                   yes    connected
+postgis_extension                                    yes    3.4 USE_GEOS=1 USE_PROJ=1 USE_STATS=1
+schema:analytics                                     yes    present
+...
+fn_alert_candidates:single_overload                  yes    count=1
+fn_alert_candidates:param_count                      yes    expected=23 actual=23 args=p_warn_hours integer, ...
+select:v_alert_candidates                            yes    ok
+select:analytics.v_calibration_confidence_summary    yes    ok
+...
+db_doctor: all checks passed.
+```
+
+Failures usually mean missing migrations/views, empty schemas on a new volume before **`make db-bootstrap-minimal`**, or ambiguous **`fn_alert_candidates`** overloads (repair path above).
+
+### Spark normalization / JDBC
+
+- Executor containers need **`PSYCOPG_CONNINFO`** (or JDBC URL + credentials) and **`KAFKA_BOOTSTRAP_SERVERS`** — see **`scripts/run_normalize.sh`**. The smoke-risk job uses the same Spark image but runs **`python3`** with psycopg only (**`scripts/run_compute_risk.sh`**).
 - **GDAL / census paths**: the `gdal-utils` profile mounts `./data/raw/census` at **`/data/census`** inside the container; loaders write under `data/raw/census/` on the host.
 - **County download fallback**: if a state county zip is missing for a TIGER year, the downloader uses the **national county file** and filters by **`STATEFP`** during load (see `scripts/download_census_boundaries.sh`).
 - **Ingestion runs require Postgres**: producers open a DB connection to create/update **`analytics.ingestion_runs`**; ensure Postgres is up and migrations have been applied (`make db-bootstrap`).

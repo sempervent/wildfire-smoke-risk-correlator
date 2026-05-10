@@ -28,8 +28,10 @@ make version
 
 echo "==> release_check: release docs + changelog"
 test -f "${ROOT_DIR}/docs/release/v1.0.0.md"
+test -f "${ROOT_DIR}/docs/release/v1.0.1.md"
 test -f "${ROOT_DIR}/CHANGELOG.md"
 grep -qiE '(v1\.0\.0|\[1\.0\.0\])' "${ROOT_DIR}/CHANGELOG.md"
+grep -qiE '(v1\.0\.1|\[1\.0\.1\])' "${ROOT_DIR}/CHANGELOG.md"
 
 echo "==> release_check: AGENTS.md Phase 14 release / drift invariants"
 grep -qi "Phase 14" "${ROOT_DIR}/AGENTS.md"

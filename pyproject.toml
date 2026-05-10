@@ -1,6 +1,6 @@
 [project]
 name = "wildfire-smoke-risk-correlator"
-version = "1.0.0"
+version = "1.0.1"
 description = "Kafka + Spark + PostGIS wildfire and smoke-risk correlator (local vertical slice)."
 readme = "README.md"
 requires-python = ">=3.11"

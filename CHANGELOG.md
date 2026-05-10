@@ -2,6 +2,18 @@
 
 All notable changes to this project are documented here. Releases are **engineering milestones** — they do **not** imply scientific validation of smoke-risk outputs.
 
+## [1.0.1] — 2026-05-10
+
+### Added
+
+- **Integration workflow:** scheduled and **`workflow_dispatch`** runs invoke **`release_check.sh`** with **`COMPOSE_INTEGRATION=1`** after the Compose bootstrap path; optional **`upload-artifact`** for **`make export-calibration`** outputs (best-effort).
+- **Documentation:** **`docs/release/v1.0.1.md`** maintenance stub (overload repair notes), **`README.md`** **`db-doctor`** troubleshooting examples, self-hosted runner pointers in workflow comments.
+- **GitHub:** issue form **Ops / bug / data / calibration feedback** (`.github/ISSUE_TEMPLATE/ops_feedback.yml`).
+
+### Notes
+
+- No changes to risk formulas, modeling claims, or default data sources.
+
 ## [1.0.0] — 2026-05-10
 
 ### Added

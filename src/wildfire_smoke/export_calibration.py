@@ -81,7 +81,7 @@ def package_version() -> str:
 
         return pkg_version("wildfire-smoke-risk-correlator")
     except Exception:
-        return "1.0.0"
+        return "1.0.1"
 
 
 def fetch_model_versions(settings: Settings) -> list[str]:
