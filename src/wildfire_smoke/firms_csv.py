@@ -13,6 +13,12 @@ def detection_id(source: str, latitude: float, longitude: float, acq_datetime: d
     return hashlib.sha256(base.encode("utf-8")).hexdigest()
 
 
+def firms_acquisition_datetime(record: dict[str, Any]) -> datetime:
+    """Parse FIRMS CSV acquisition time (UTC) from acq_date / acq_time columns."""
+
+    return _parse_acq_datetime(record)
+
+
 def _parse_acq_datetime(record: dict[str, Any]) -> datetime:
     acq_date = str(record.get("acq_date") or "").strip()
     acq_time = str(record.get("acq_time") or "").strip()
@@ -52,7 +58,7 @@ def parse_firms_csv_text(csv_text: str) -> list[dict[str, Any]]:
 def normalized_fire_fields(source: str, record: dict[str, Any]) -> dict[str, Any]:
     lat = float(record["latitude"])
     lon = float(record["longitude"])
-    acq = _parse_acq_datetime(record)
+    acq = firms_acquisition_datetime(record)
 
     confidence = record.get("confidence")
     brightness_raw = record.get("brightness") or record.get("bright_t31")

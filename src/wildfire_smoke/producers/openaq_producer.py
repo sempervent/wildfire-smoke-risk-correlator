@@ -12,6 +12,12 @@ import httpx
 from kafka import KafkaProducer
 
 from wildfire_smoke.db.connection import connect
+from wildfire_smoke.fixture_time import (
+    attach_fixture_time_metadata,
+    collect_openaq_measurement_times,
+    compute_shift_to_anchor,
+    rewrite_openaq_envelope,
+)
 from wildfire_smoke.ingestion_runs import create_run, finish_run
 from wildfire_smoke.logging import configure_logging
 from wildfire_smoke.openaq_records import normalized_measurement_fields, parse_openaq_datetime
@@ -234,12 +240,24 @@ def main() -> None:
                 raise FileNotFoundError(f"OpenAQ fixture JSONL not found: {fixture}")
             fetched_at = datetime.now(timezone.utc).isoformat()
             log.info("openaq_dry_run_enabled", extra={"fixture": str(fixture)})
+            envelopes: list[dict[str, Any]] = []
             for line in fixture.read_text(encoding="utf-8").splitlines():
                 line = line.strip()
                 if not line:
                     continue
-                envelope = json.loads(line)
+                envelopes.append(json.loads(line))
+
+            shift = timedelta(0)
+            if settings.fixture_time_mode == "relative" and envelopes:
+                times = collect_openaq_measurement_times(envelopes)
+                if times:
+                    shift = compute_shift_to_anchor(times, base_hours_ago=settings.fixture_relative_base_hours_ago)
+
+            for envelope in envelopes:
                 records_fetched += 1
+                if settings.fixture_time_mode == "relative" and shift.total_seconds() != 0:
+                    orig = rewrite_openaq_envelope(envelope, shift)
+                    attach_fixture_time_metadata(envelope, original_observed_at=orig, rewritten=True)
                 try:
                     producer.send(topics["openaq_raw_topic"], value=envelope)
                     records_published += 1

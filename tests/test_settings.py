@@ -13,6 +13,9 @@ def test_kafka_topics_include_expected_keys() -> None:
     assert topics["firms_dlq_topic"] == "firms.hotspots.dlq"
     assert topics["openaq_dlq_topic"] == "openaq.measurements.dlq"
     assert topics["wind_dlq_topic"] == "weather.wind.dlq"
+    assert topics["grid_weather_raw_topic"] == "weather.grid.raw"
+    assert topics["grid_weather_dlq_topic"] == "weather.grid.dlq"
+    assert topics["grid_weather_normalized_topic"] == "weather.grid.normalized"
     assert topics["normalization_errors_topic"] == "normalization.errors"
 
 
@@ -48,6 +51,24 @@ def test_smoke_risk_settings_defaults(monkeypatch) -> None:
 def test_smoke_risk_settings_invalid_model_version(monkeypatch) -> None:
     monkeypatch.setenv("SMOKE_RISK_MODEL_VERSION", "v999")
     with pytest.raises(ValueError, match="SMOKE_RISK_MODEL_VERSION"):
+        Settings.from_env()
+
+
+def test_grid_weather_points_parsing(monkeypatch) -> None:
+    monkeypatch.setenv("GRID_WEATHER_POINTS", "-86.8,36.16;-86.7,36.2")
+    s = Settings.from_env()
+    assert s.grid_weather_points_lonlat == ((-86.8, 36.16), (-86.7, 36.2))
+
+
+def test_grid_weather_points_invalid(monkeypatch) -> None:
+    monkeypatch.setenv("GRID_WEATHER_POINTS", "lonlat")
+    with pytest.raises(ValueError, match="GRID_WEATHER_POINTS"):
+        Settings.from_env()
+
+
+def test_fixture_time_mode_invalid(monkeypatch) -> None:
+    monkeypatch.setenv("FIXTURE_TIME_MODE", "nope")
+    with pytest.raises(ValueError, match="FIXTURE_TIME_MODE"):
         Settings.from_env()
 
 

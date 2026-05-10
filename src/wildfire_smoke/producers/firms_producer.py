@@ -3,13 +3,18 @@ from __future__ import annotations
 import json
 import logging
 import os
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 import httpx
 from kafka import KafkaProducer
 
 from wildfire_smoke import firms_csv
+from wildfire_smoke.fixture_time import (
+    attach_fixture_time_metadata,
+    compute_shift_to_anchor,
+    rewrite_firms_rows,
+)
 from wildfire_smoke.db.connection import connect
 from wildfire_smoke.ingestion_runs import create_run, finish_run
 from wildfire_smoke.logging import configure_logging
@@ -109,13 +114,28 @@ def main() -> None:
         rows_len = len(rows)
         log.info("firms_rows_parsed", extra={"count": rows_len})
 
-        for row in rows:
+        shift = timedelta(0)
+        original_acqs: list[str | None] = [None] * len(rows)
+        if settings.firms_dry_run and settings.fixture_time_mode == "relative":
+            times = [firms_csv.firms_acquisition_datetime(r) for r in rows]
+            shift = compute_shift_to_anchor(times, base_hours_ago=settings.fixture_relative_base_hours_ago)
+            if shift.total_seconds() != 0:
+                original_acqs = rewrite_firms_rows(rows, shift)
+
+        for i, row in enumerate(rows):
             envelope = {
                 "source": settings.firms_source,
                 "fetched_at": fetched_at,
                 "api_url_without_secret": api_url_without_secret,
                 "record": row,
             }
+            if settings.firms_dry_run and settings.fixture_time_mode == "relative" and shift.total_seconds() != 0:
+                attach_fixture_time_metadata(
+                    envelope,
+                    original_observed_at=original_acqs[i],
+                    rewritten=True,
+                )
+
             try:
                 producer.send(topics["firms_raw_topic"], value=envelope)
                 sent += 1

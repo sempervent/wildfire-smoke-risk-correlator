@@ -5,7 +5,7 @@ from __future__ import annotations
 import json
 import logging
 import os
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any
 
@@ -13,6 +13,11 @@ import httpx
 from kafka import KafkaProducer
 
 from wildfire_smoke.db.connection import connect
+from wildfire_smoke.fixture_time import (
+    attach_fixture_time_metadata,
+    compute_shift_to_anchor,
+    rewrite_wind_json_object,
+)
 from wildfire_smoke.ingestion_runs import create_run, finish_run
 from wildfire_smoke.logging import configure_logging
 from wildfire_smoke.settings import Settings, kafka_topics, repo_root
@@ -57,6 +62,19 @@ def _envelope(source: str, normalized: dict[str, Any]) -> dict[str, Any]:
         "fetched_at": datetime.now(timezone.utc).isoformat(),
         "record": {"normalized": normalized},
     }
+
+
+def _wind_observed_times(objs: list[dict[str, Any]]) -> list[datetime]:
+    out: list[datetime] = []
+    for obj in objs:
+        raw = obj.get("observed_at")
+        if not raw:
+            continue
+        dt = datetime.fromisoformat(str(raw).replace("Z", "+00:00"))
+        if dt.tzinfo is None:
+            dt = dt.replace(tzinfo=timezone.utc)
+        out.append(dt.astimezone(timezone.utc))
+    return out
 
 
 def _nws_speed_to_mps(prop: dict[str, Any] | None) -> float | None:
@@ -153,13 +171,29 @@ def main() -> None:
             if not fixture.exists():
                 raise FileNotFoundError(f"WIND fixture JSONL not found: {fixture}")
             log.info("wind_dry_run_enabled", extra={"fixture": str(fixture)})
+            objs: list[dict[str, Any]] = []
             for line in fixture.read_text(encoding="utf-8").splitlines():
                 line = line.strip()
                 if not line:
                     continue
-                obj = json.loads(line)
+                objs.append(json.loads(line))
+
+            shift = timedelta(0)
+            wind_originals: list[str | None] = [None] * len(objs)
+            if settings.fixture_time_mode == "relative" and objs:
+                times = _wind_observed_times(objs)
+                if times:
+                    shift = compute_shift_to_anchor(times, base_hours_ago=settings.fixture_relative_base_hours_ago)
+                if shift.total_seconds() != 0:
+                    for i, obj in enumerate(objs):
+                        wind_originals[i] = rewrite_wind_json_object(obj, shift)
+
+            for i, obj in enumerate(objs):
                 normalized = normalized_wind_from_dict(obj)
-                envelopes.append(_envelope(str(normalized["source"]), normalized))
+                env = _envelope(str(normalized["source"]), normalized)
+                if settings.fixture_time_mode == "relative" and shift.total_seconds() != 0:
+                    attach_fixture_time_metadata(env, original_observed_at=wind_originals[i], rewritten=True)
+                envelopes.append(env)
                 fetched += 1
         else:
             if settings.wind_source not in {"nws"}:

@@ -77,6 +77,11 @@ class Settings:
     smoke_risk_nearby_km: float
     smoke_risk_geographies: str
 
+    fixture_time_mode: str
+    fixture_relative_base_hours_ago: float
+
+    grid_weather_points_lonlat: tuple[tuple[float, float], ...]
+
     @staticmethod
     def from_env() -> "Settings":
         load_dotenv(repo_root() / ".env", override=False)
@@ -185,6 +190,23 @@ class Settings:
         if smoke_risk_geographies not in {"county", "tract", "both"}:
             raise ValueError("SMOKE_RISK_GEOGRAPHIES must be one of: county, tract, both")
 
+        fixture_time_mode = os.environ.get("FIXTURE_TIME_MODE", "static").strip().lower()
+        if fixture_time_mode not in {"static", "relative"}:
+            raise ValueError("FIXTURE_TIME_MODE must be one of: static, relative")
+        fixture_relative_base_hours_ago = float(os.environ.get("FIXTURE_RELATIVE_BASE_HOURS_AGO", "1"))
+
+        pts: list[tuple[float, float]] = []
+        gw_pts_raw = os.environ.get("GRID_WEATHER_POINTS", "").strip()
+        for chunk in gw_pts_raw.split(";"):
+            chunk = chunk.strip()
+            if not chunk:
+                continue
+            parts = chunk.split(",")
+            if len(parts) != 2:
+                raise ValueError("GRID_WEATHER_POINTS entries must be lon,lat separated by ';'")
+            pts.append((float(parts[0].strip()), float(parts[1].strip())))
+        grid_weather_points_lonlat = tuple(pts)
+
         return Settings(
             kafka_bootstrap_servers=kafka_bootstrap_servers,
             postgres_host=postgres_host,
@@ -231,6 +253,9 @@ class Settings:
             smoke_risk_lookback_hours=smoke_risk_lookback_hours,
             smoke_risk_nearby_km=smoke_risk_nearby_km,
             smoke_risk_geographies=smoke_risk_geographies,
+            fixture_time_mode=fixture_time_mode,
+            fixture_relative_base_hours_ago=fixture_relative_base_hours_ago,
+            grid_weather_points_lonlat=grid_weather_points_lonlat,
         )
 
 

@@ -4,6 +4,10 @@ set -euo pipefail
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "${ROOT_DIR}"
 
+# shellcheck source=scripts/lib/fixture_paths.sh
+source "${ROOT_DIR}/scripts/lib/fixture_paths.sh"
+apply_aligned_fixture_paths
+
 export WIND_DRY_RUN="${WIND_DRY_RUN:-1}"
 export KAFKA_BOOTSTRAP_SERVERS="${KAFKA_BOOTSTRAP_SERVERS:-localhost:19092}"
 
