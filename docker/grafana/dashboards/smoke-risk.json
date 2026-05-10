@@ -947,16 +947,130 @@
       ],
       "title": "Risk calibration summary",
       "type": "table"
+    },
+    {
+      "datasource": {"type": "postgres", "uid": "smoke_pg"},
+      "fieldConfig": {"defaults": {}, "overrides": []},
+      "gridPos": {"h": 7, "w": 12, "x": 0, "y": 212},
+      "id": 419,
+      "options": {"showHeader": true},
+      "targets": [
+        {
+          "datasource": {"type": "postgres", "uid": "smoke_pg"},
+          "editorMode": "code",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "SELECT geography_type, geoid, detection_id, dispersion_score, distance_km, downwind_distance_km, window_start, window_end FROM analytics.v_latest_smoke_dispersion_exposures ORDER BY dispersion_score DESC NULLS LAST LIMIT 200;",
+          "refId": "A"
+        }
+      ],
+      "title": "Latest dispersion exposures (gaussian_v0)",
+      "type": "table"
+    },
+    {
+      "datasource": {"type": "postgres", "uid": "smoke_pg"},
+      "fieldConfig": {"defaults": {}, "overrides": []},
+      "gridPos": {"h": 7, "w": 12, "x": 12, "y": 212},
+      "id": 420,
+      "options": {"showHeader": true},
+      "targets": [
+        {
+          "datasource": {"type": "postgres", "uid": "smoke_pg"},
+          "editorMode": "code",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "SELECT * FROM analytics.v_top_dispersion_exposures LIMIT 100;",
+          "refId": "A"
+        }
+      ],
+      "title": "Top dispersion exposures (latest window)",
+      "type": "table"
+    },
+    {
+      "datasource": {"type": "postgres", "uid": "smoke_pg"},
+      "fieldConfig": {"defaults": {}, "overrides": []},
+      "gridPos": {"h": 6, "w": 24, "x": 0, "y": 219},
+      "id": 421,
+      "options": {"showHeader": true},
+      "targets": [
+        {
+          "datasource": {"type": "postgres", "uid": "smoke_pg"},
+          "editorMode": "code",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "SELECT * FROM analytics.v_dispersion_operational_summary;",
+          "refId": "A"
+        }
+      ],
+      "title": "Dispersion operational summary",
+      "type": "table"
+    },
+    {
+      "datasource": {"type": "postgres", "uid": "smoke_pg"},
+      "fieldConfig": {"defaults": {}, "overrides": []},
+      "gridPos": {"h": 7, "w": 12, "x": 0, "y": 225},
+      "id": 422,
+      "options": {"showHeader": true},
+      "targets": [
+        {
+          "datasource": {"type": "postgres", "uid": "smoke_pg"},
+          "editorMode": "code",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "SELECT geography_type, geoid, lag_bucket, max_dispersion_score, avg_pm25, avg_pm10, aq_observation_count, comparison_score FROM analytics.v_dispersion_aq_comparisons LIMIT 200;",
+          "refId": "A"
+        }
+      ],
+      "title": "Dispersion vs AQ lag comparisons",
+      "type": "table"
+    },
+    {
+      "datasource": {"type": "postgres", "uid": "smoke_pg"},
+      "fieldConfig": {"defaults": {}, "overrides": []},
+      "gridPos": {"h": 7, "w": 12, "x": 12, "y": 225},
+      "id": 423,
+      "options": {"showHeader": true},
+      "targets": [
+        {
+          "datasource": {"type": "postgres", "uid": "smoke_pg"},
+          "editorMode": "code",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "SELECT geography_type, geoid, risk_score, risk_band, computed_at, explanation FROM analytics.v_latest_smoke_risk_v5 ORDER BY risk_score DESC NULLS LAST LIMIT 200;",
+          "refId": "A"
+        }
+      ],
+      "title": "Latest smoke risk v5",
+      "type": "table"
+    },
+    {
+      "datasource": {"type": "postgres", "uid": "smoke_pg"},
+      "fieldConfig": {"defaults": {}, "overrides": []},
+      "gridPos": {"h": 8, "w": 24, "x": 0, "y": 232},
+      "id": 424,
+      "options": {"showHeader": true},
+      "targets": [
+        {
+          "datasource": {"type": "postgres", "uid": "smoke_pg"},
+          "editorMode": "code",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "SELECT dispersion_exposure_id, detection_id, geography_type, geoid, dispersion_score, concentration_proxy, explanation FROM analytics.v_dispersion_model_debug;",
+          "refId": "A"
+        }
+      ],
+      "title": "Dispersion debug (truncated)",
+      "type": "table"
     }
   ],
   "refresh": "30s",
   "schemaVersion": 39,
-  "tags": ["smoke", "wildfire", "phase3", "phase5", "phase6", "phase7", "phase8", "phase9", "phase10"],
+  "tags": ["smoke", "wildfire", "phase3", "phase5", "phase6", "phase7", "phase8", "phase9", "phase10", "phase11"],
   "templating": {"list": []},
   "time": {"from": "now-7d", "to": "now"},
   "timepicker": {},
   "timezone": "browser",
-  "title": "Wildfire Smoke Risk (Phase 3–10 ops)",
+  "title": "Wildfire Smoke Risk (Phase 3–11 ops)",
   "uid": "wildfire-smoke-phase2",
   "version": 5,
   "weekStart": ""
