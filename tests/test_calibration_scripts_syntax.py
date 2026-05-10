@@ -11,5 +11,8 @@ def test_calibration_shell_scripts_parse() -> None:
         "scripts/load_risk_observation_fixtures.sh",
         "scripts/calibration_summary.sh",
         "scripts/calibration_demo.sh",
+        "scripts/load_minimal_census_fixtures.sh",
+        "scripts/export_calibration.sh",
+        "scripts/release_check.sh",
     ):
         subprocess.run(["bash", "-n", str(root / name)], check=True)
