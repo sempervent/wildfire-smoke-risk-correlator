@@ -18,6 +18,8 @@ This repository implements a **Kafka + Spark + PostGIS** pipeline that correlate
 
 **Phase 9** adds **bounded gridded weather** (`weather.grid.raw|normalized|dlq`), **`raw.gridded_weather`** + **`normalized.weather_grid_cells`** + **`analytics.fire_weather_matches`**, Spark **`normalize_grid_weather`** / **`match_fire_weather`**, plume model **`wind_grid_v2`** (prefers matched grid wind; optional **`PLUME_GRID_FALLBACK_TO_STATION`**), risk model **`v4`** (v2 base + grid plume blend + humidity dampening — still **not** dispersion-grade), SQL presentation views, alerts (**`grid_weather_stale`**, **`no_recent_grid_weather`**, **`fire_weather_unmatched_high`**, **`grid_weather_parse_errors_high`**), Grafana tables, and **`make grid-weather-demo`** / **`GRID_WEATHER_SMOKE=1`** smoke hooks.
 
+**Phase 10** adds **no-secrets Compose integration regression** (`make integration-regression`; optional **`RUN_BOOTSTRAP=1`** / default **`SKIP_BOOTSTRAP=1`** to avoid census re-download), **fixture timestamp modes** (`FIXTURE_TIME_MODE=static|relative` with **`FIXTURE_RELATIVE_BASE_HOURS_AGO`**) that rewrite payloads **in memory only** (metadata: **`original_observed_at`**, **`fixture_time_rewritten`**), **deterministic aligned fixtures** (`USE_ALIGNED_FIXTURES=1`), **`make assert-integration-state`** / **`scripts/assert_integration_state.sh`**, **`make evaluate-risk`** over **`analytics.risk_observations`** vs **`analytics.smoke_risk_scores`** (exits **0** when nothing to compare), a **`GridWeatherProvider`** abstraction (**fixture** + **NWS `/points` → `forecastGridData`** with point cache and **`GRID_WEATHER_POINTS`** / **`GRID_WEATHER_MAX_POINTS`** bounds), calibration DDL (**`analytics.risk_observations`**, **`analytics.risk_model_evaluations`**) + SQL views (`analytics.v_integration_pipeline_counts`, …), new alert candidates (**`integration_pipeline_incomplete`**, **`v4_risk_missing`**, **`fire_weather_match_missing`**) with runbooks, **`make integration-smoke-test`**, and Grafana panels for pipeline counts / v4 explanations / unmatched fire–weather / calibration summaries.
+
 Wind direction uses the **meteorological convention** (*wind FROM*); modeled smoke transport uses the **opposite bearing** (see `src/wildfire_smoke/wind.py`).
 
 **Important:** the risk score is a **demonstration / operations correlation index**, not a health advisory model.
@@ -431,6 +433,35 @@ This wipes the Postgres volume, recreates topics, re-downloads Census data for t
 - Live NWS grid coverage is **not** a full mesonet; defaults stay **small bbox** / **`GRID_WEATHER_MAX_POINTS`** caps.
 - **`analytics.v_dlq_topic_depth`** remains a coarse proxy on dev volumes with retained DLQ traffic.
 
+### Phase 10 — integration regression, fixture time alignment, calibration
+
+**Full pipeline regression (no API keys)**
+
+- **`make integration-regression`** runs topics → FIRMS/OpenAQ/wind/grid fixture replay → normalizers → match → plume **`wind_grid_v2`** → risk **`v4`** → lag → quality → alerts (warn-only check, dry-run materialize, console send) → **`make assert-integration-state`**.
+- Defaults **`SKIP_BOOTSTRAP=1`** (skips **`make db-bootstrap`**). Set **`RUN_BOOTSTRAP=1`** for a full census pull + migrations on a fresh volume.
+- Uses **`FIXTURE_TIME_MODE=relative`** and **`USE_ALIGNED_FIXTURES=1`** so downstream assertions can expect fire–weather matches, plume rows, and v4 explanations without mutating files on disk.
+- **`make integration-smoke-test`** validates script wiring without running the full heavy loop by default.
+
+**Fixture time and aligned data**
+
+- **`FIXTURE_TIME_MODE=static`** (default): preserve timestamps from CSV/JSONL fixtures.
+- **`FIXTURE_TIME_MODE=relative`**: shift observation times to **`nowUTC − FIXTURE_RELATIVE_BASE_HOURS_AGO`** before publishing; producers attach **`original_observed_at`** and **`fixture_time_rewritten=true`** in envelopes where applicable.
+- **`USE_ALIGNED_FIXTURES=1`**: use **`tests/fixtures/*_aligned_sample.*`** for FIRMS, OpenAQ, wind, and grid weather so geography and time line up for demos.
+
+**Assertions and evaluation hooks**
+
+- **`make assert-integration-state`** — minimum row-count checks; set **`STRICT_ALIGNED_ASSERTS=1`** when matches/plumes are required; **`EXPECT_PARSE_ERRORS=0|1`** toggles tolerance for quarantine rows.
+- **`make evaluate-risk`** — lightweight comparison hook; safe **exit 0** when **`analytics.risk_observations`** is empty.
+
+**Live NWS gridpoint ingest**
+
+- Bounded by **`GRID_WEATHER_BBOX`** or explicit **`GRID_WEATHER_POINTS=lon,lat;lon,lat;...`** (trimmed by **`GRID_WEATHER_MAX_POINTS`**).
+- Implementation lives in **`src/wildfire_smoke/grid_weather_provider.py`** (`NwsGridpointWeatherProvider`); the producer delegates to **`fetch_grid_weather`-style** providers for easier future HRRR/RAP backends.
+
+**Phase 10 DDL**
+
+- Apply **`sql/migrations/010_phase10_calibration.sql`** (and views **`sql/views/zzz_phase10_10_integration_and_calibration_views.sql`**) via **`make db-bootstrap`** or **`psql`** on existing volumes. **`analytics.fn_alert_candidates`** must be reapplied after those views exist (see bootstrap order under `sql/views/`).
+
 ## Makefile targets
 
 | Target          | Purpose                                              |
@@ -474,6 +505,10 @@ This wipes the Postgres volume, recreates topics, re-downloads Census data for t
 | `make operational-scheduler-up` | Start Compose **`scheduler`** profile loop |
 | `make demo`           | No-secrets local demo (`replay-fixtures` path)   |
 | `make smoke-test`   | Run `scripts/smoke_test.sh` (optional **`GRID_WEATHER_SMOKE=1`**)                      |
+| `make integration-regression` | Full no-secrets fixture path + **`assert-integration-state`** (optional **`RUN_BOOTSTRAP=1`**) |
+| `make integration-smoke-test` | Lightweight Phase 10 wiring checks (`scripts/integration_smoke_test.sh`) |
+| `make assert-integration-state` | **`scripts/assert_integration_state.sh`** — pipeline row-count assertions |
+| `make evaluate-risk` | **`scripts/evaluate_risk_model.sh`** — compare scores vs **`risk_observations`** |
 | `make test`     | Run pytest                                           |
 
 ## Inspecting Kafka topics
@@ -509,6 +544,7 @@ Stable analytics views for dashboards include:
 - **Phase 7 DLQ / offsets:** `analytics.v_parse_errors_open`, `analytics.v_parse_error_summary`, `analytics.v_parse_errors_recent`, `analytics.v_consumer_offset_state`, `analytics.v_dlq_operational_summary`
 - **Phase 8 lag / replay:** `analytics.v_kafka_topic_depth`, `analytics.v_consumer_lag_latest`, `analytics.v_dlq_topic_depth`, `analytics.v_pipeline_lag_summary`, `analytics.v_dlq_replay_runs`, `analytics.v_dlq_replay_items_recent`
 - **Phase 9 grid weather:** `analytics.v_latest_weather_grid_cells`, `analytics.v_latest_weather_grid_cells_geojson`, `analytics.v_fire_weather_matches`, `analytics.v_fire_weather_match_summary`, `analytics.v_latest_smoke_plume_exposures_v2`, `analytics.v_latest_smoke_risk_v4`, `analytics.v_grid_weather_operational_summary`
+- **Phase 10 integration / calibration:** `analytics.v_integration_pipeline_counts`, `analytics.v_latest_risk_v4_explanations`, `analytics.v_fire_weather_unmatched`, `analytics.v_risk_observations`, `analytics.v_risk_model_evaluations`, `analytics.v_risk_calibration_summary`
 - **Phase 3 SLIs / alerts:** `analytics.v_sli_*`, `analytics.v_alert_candidates`, `analytics.fn_alert_candidates(...)`
 
 Producer runs append rows to **`analytics.ingestion_runs`** (`run_id`, `source`, `mode` `live|dry_run`, counts, `config` JSON without secrets, `error_message` on failure).

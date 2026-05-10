@@ -32,6 +32,11 @@ This repository is a **local-first vertical slice** for correlating NASA FIRMS h
 - **Replay bookkeeping:** `replay-dlq` defaults to **`DRY_RUN=1`**; **`DLQ_REPLAY_BOOKKEEPING`** defaults on — preserve audit rows instead of deleting parse-error history.
 - **Parse errors lifecycle:** **`parse-errors-compact`** defaults to **report-only** (`DRY_RUN=1`); avoid deleting **`parse_errors`** rows — archival to **`archived`** is explicit opt-in.
 - **Phase 9 gridded weather:** live ingest stays **bounded** (`GRID_WEATHER_BBOX` span guards mirror **`LIVE_INGEST_*`**; **`GRID_WEATHER_REFUSE_LARGE_BBOX`** defaults on). **`GRID_WEATHER_DRY_RUN=1`** + checked-in fixtures must remain **no-secrets**. Malformed grid payloads belong in **`analytics.parse_errors`** and **`weather.grid.dlq`** like other normalizers—never silently drop accountability.
+- **Phase 10 integration regression:** **`make integration-regression`** must stay **no-secrets** (fixture producers + Spark + Postgres only). Prefer **`SKIP_BOOTSTRAP=1`** / **`RUN_BOOTSTRAP=0`** in CI-style runs unless census download is explicitly intended.
+- **Aligned fixtures:** **`USE_ALIGNED_FIXTURES=1`** samples under **`tests/fixtures/*_aligned_sample.*`** should stay **deterministic** (fixed coordinates and relative ordering) so integration assertions remain stable across machines.
+- **Live NWS gridpoint ingest:** keep **`GRID_WEATHER_BBOX`** / **`GRID_WEATHER_POINTS`** + **`GRID_WEATHER_MAX_POINTS`** as the primary bounds—never expand to “whole CONUS” by default.
+- **Fixture timestamp rewriting:** **`FIXTURE_TIME_MODE=relative`** mutates **Kafka payloads in memory only**; **never rewrite fixture files on disk** as part of normal replay.
+- **Calibration hooks:** **`analytics.risk_observations`**, **`analytics.risk_model_evaluations`**, and **`make evaluate-risk`** are **evaluation scaffolding**, not validated epidemiology or forecasting science—do not treat outputs as peer-reviewed metrics without external methodology.
 
 ## Operating constraints
 

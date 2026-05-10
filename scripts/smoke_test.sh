@@ -133,6 +133,9 @@ test -f "${ROOT_DIR}/docs/runbooks/replay-failures-recent.md"
 test -f "${ROOT_DIR}/docs/runbooks/grid-weather-stale.md"
 test -f "${ROOT_DIR}/docs/runbooks/no-recent-grid-weather.md"
 test -f "${ROOT_DIR}/docs/runbooks/fire-weather-unmatched-high.md"
+test -f "${ROOT_DIR}/docs/runbooks/integration-pipeline-incomplete.md"
+test -f "${ROOT_DIR}/docs/runbooks/v4-risk-missing.md"
+test -f "${ROOT_DIR}/docs/runbooks/fire-weather-match-missing.md"
 
 echo "==> Phase 9 gridded weather (tables / views / topics)"
 for t in weather.grid.raw weather.grid.dlq weather.grid.normalized; do
@@ -146,6 +149,14 @@ if [[ "${GRID_WEATHER_SMOKE:-0}" == "1" ]]; then
   echo "==> GRID_WEATHER_SMOKE=1: grid-weather demo chain (Spark + plume v2 + risk v4)"
   bash "${ROOT_DIR}/scripts/grid_weather_demo.sh"
 fi
+
+echo "==> Phase 10 integration scripts / calibration hooks"
+bash -n "${ROOT_DIR}/scripts/integration_regression.sh"
+bash -n "${ROOT_DIR}/scripts/assert_integration_state.sh"
+bash -n "${ROOT_DIR}/scripts/evaluate_risk_model.sh"
+${COMPOSE} exec -T postgres psql -v ON_ERROR_STOP=1 -U "${POSTGRES_USER}" -d "${POSTGRES_DB}" -c "SELECT COUNT(*) FROM analytics.risk_observations;" >/dev/null 2>&1 || echo "WARN: analytics.risk_observations missing (apply migration 010)." >&2
+${COMPOSE} exec -T postgres psql -v ON_ERROR_STOP=1 -U "${POSTGRES_USER}" -d "${POSTGRES_DB}" -c "SELECT COUNT(*) FROM analytics.v_integration_pipeline_counts;" >/dev/null 2>&1 || echo "WARN: analytics.v_integration_pipeline_counts missing (apply Phase 10 views)." >&2
+bash "${ROOT_DIR}/scripts/evaluate_risk_model.sh"
 
 echo "==> Phase 4 alert persistence + routing (table + dry-run materialize + console send)"
 ${COMPOSE} exec -T postgres psql -v ON_ERROR_STOP=1 -U "${POSTGRES_USER}" -d "${POSTGRES_DB}" -c \
