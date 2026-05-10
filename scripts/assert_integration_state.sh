@@ -11,6 +11,8 @@ POSTGRES_DB="${POSTGRES_DB:-smoke}"
 STRICT_ALIGNED_ASSERTS="${STRICT_ALIGNED_ASSERTS:-0}"
 EXPECT_PARSE_ERRORS="${EXPECT_PARSE_ERRORS:-0}"
 EXPECT_DISPERSION="${EXPECT_DISPERSION:-0}"
+STRICT_CALIBRATION_ASSERTS="${STRICT_CALIBRATION_ASSERTS:-0}"
+LOAD_RISK_OBSERVATION_FIXTURES="${LOAD_RISK_OBSERVATION_FIXTURES:-0}"
 
 fail() {
   echo "ASSERT_FAILED: $*" >&2
@@ -122,6 +124,34 @@ fi
 OPEN_PE="$(psql_exec -At -c "SELECT COUNT(*)::text FROM analytics.parse_errors WHERE status='open';")"
 if [[ "${EXPECT_PARSE_ERRORS}" == "0" ]] && [[ "${OPEN_PE}" != "0" ]]; then
   warn "open parse_errors=${OPEN_PE} (EXPECT_PARSE_ERRORS=0)"
+fi
+
+if [[ "${LOAD_RISK_OBSERVATION_FIXTURES}" == "1" ]] || [[ "${STRICT_CALIBRATION_ASSERTS}" == "1" ]]; then
+  psql_exec -c "SELECT 1 FROM analytics.v_calibration_confidence_summary LIMIT 1;" >/dev/null 2>&1 \
+    || fail "Phase 12 calibration views missing (apply sql/views/zzz_phase12_calibration_views.sql after migration 012)."
+  OBS_CALIB="$(psql_exec -At -c "SELECT COUNT(*)::text FROM analytics.risk_observations;")"
+  if [[ "${LOAD_RISK_OBSERVATION_FIXTURES}" == "1" ]]; then
+    [[ "${OBS_CALIB}" =~ ^[0-9]+$ ]] || fail "bad risk_observations count"
+    if [[ "${OBS_CALIB}" -lt 1 ]]; then
+      fail "LOAD_RISK_OBSERVATION_FIXTURES=1: expected analytics.risk_observations >= 1, got ${OBS_CALIB}"
+    fi
+  fi
+  if [[ "${STRICT_CALIBRATION_ASSERTS}" == "1" ]]; then
+    [[ "${OBS_CALIB}" =~ ^[0-9]+$ ]] || fail "bad risk_observations count"
+    if [[ "${OBS_CALIB}" -lt 1 ]]; then
+      fail "STRICT_CALIBRATION_ASSERTS=1: expected analytics.risk_observations >= 1, got ${OBS_CALIB}"
+    fi
+    EVAL_N="$(psql_exec -At -c "SELECT COUNT(*)::text FROM analytics.risk_model_evaluations;")"
+    [[ "${EVAL_N}" =~ ^[0-9]+$ ]] || fail "bad evaluation count"
+    if [[ "${EVAL_N}" -lt 1 ]]; then
+      fail "STRICT_CALIBRATION_ASSERTS=1: expected analytics.risk_model_evaluations >= 1, got ${EVAL_N}"
+    fi
+    DAC_N="$(psql_exec -At -c "SELECT COUNT(*)::text FROM analytics.dispersion_aq_comparisons;")"
+    [[ "${DAC_N}" =~ ^[0-9]+$ ]] || fail "bad dispersion_aq_comparisons count"
+    if [[ "${DAC_N}" -lt 1 ]]; then
+      fail "STRICT_CALIBRATION_ASSERTS=1: expected analytics.dispersion_aq_comparisons >= 1 (evidence rows), got ${DAC_N}"
+    fi
+  fi
 fi
 
 echo "assert-integration-state OK (fires=${FIRE_N} aq=${AQ_N} wind=${WIND_N} grid=${GRID_N} matches=${MATCH_N} plume_v2=${PLUME_N} v4=${V4_N} v5=${V5_N} dispersion=${DISP_N} offsets=${OFF_N} lag_obs=${LAG_N})"

@@ -173,6 +173,18 @@ if [[ "${DISPERSION_SMOKE:-0}" == "1" ]]; then
   bash "${ROOT_DIR}/scripts/dispersion_demo.sh"
 fi
 
+echo "==> Phase 12 calibration scripts / SQL hooks"
+bash -n "${ROOT_DIR}/scripts/load_risk_observation_fixtures.sh"
+bash -n "${ROOT_DIR}/scripts/calibration_summary.sh"
+bash -n "${ROOT_DIR}/scripts/calibration_demo.sh"
+${COMPOSE} exec -T postgres psql -v ON_ERROR_STOP=1 -U "${POSTGRES_USER}" -d "${POSTGRES_DB}" -c "SELECT COUNT(*) FROM analytics.risk_observation_features;" >/dev/null 2>&1 || echo "WARN: analytics.risk_observation_features missing (apply migration 012)." >&2
+${COMPOSE} exec -T postgres psql -v ON_ERROR_STOP=1 -U "${POSTGRES_USER}" -d "${POSTGRES_DB}" -c "SELECT 1 FROM analytics.v_dispersion_aq_evidence_summary LIMIT 1;" >/dev/null 2>&1 || echo "WARN: Phase 12 calibration views missing (apply zzz_phase12_calibration_views.sql)." >&2
+
+if [[ "${CALIBRATION_SMOKE:-0}" == "1" ]]; then
+  echo "==> CALIBRATION_SMOKE=1: calibration demo chain (Spark-heavy)"
+  bash "${ROOT_DIR}/scripts/calibration_demo.sh"
+fi
+
 echo "==> Phase 4 alert persistence + routing (table + dry-run materialize + console send)"
 ${COMPOSE} exec -T postgres psql -v ON_ERROR_STOP=1 -U "${POSTGRES_USER}" -d "${POSTGRES_DB}" -c \
   "SELECT COUNT(*) FROM analytics.alert_events;"

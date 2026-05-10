@@ -22,6 +22,8 @@ This repository implements a **Kafka + Spark + PostGIS** pipeline that correlate
 
 **Phase 11** adds a **bounded Gaussian dispersion proxy** (`DISPERSION_MODEL_VERSION=gaussian_v0`) materialized as **`analytics.smoke_dispersion_exposures`**, optional **AQ lag-window comparisons** (`analytics.dispersion_aq_comparisons`; scaffolding only), **risk model `v5`** (v2-style base blended with plume + dispersion + capped humidity dampening), **`make compute-dispersion`** / **`make compare-dispersion-aq`** / **`make dispersion-demo`**, **`DISPERSION_ENABLED=1`** hooks in **`make operational-cycle`** (defaults **off**), new alert candidates (**`high_dispersion_exposure`**, **`dispersion_no_wind_matches`**, **`dispersion_no_targets`**, **`dispersion_aq_mismatch_high`**), Grafana tables, and **`EXPECT_DISPERSION=1`** strict assertions in **`make integration-regression`**. **Not HYSPLIT**, **not regulatory dispersion**, **not a health model** — compare against corridor plumes (`wind_v1` / `wind_grid_v2`) only as distinct engineering heuristics.
 
+**Phase 12** adds **qualitative evidence labels** on dispersion–AQ comparisons (**`no_aq_data`**, **`insufficient_aq_data`**, **`possible_overprediction`**, …), **richer `risk_model_evaluations`** metrics (MAE/RMSE, optional correlation when ≥`RISK_EVAL_MIN_MATCH_COUNT`, heuristic precision/recall on high bands), **JSONL observation fixtures** + **`make load-risk-observation-fixtures`**, **`make calibration-summary`** / **`make calibration-demo`**, calibration **SQL views**, low-severity **calibration alert candidates** (`model_overprediction_possible`, …), Grafana tables, and **`STRICT_CALIBRATION_ASSERTS`** / **`LOAD_RISK_OBSERVATION_FIXTURES`** hooks — **not scientific validation**.
+
 Wind direction uses the **meteorological convention** (*wind FROM*); modeled smoke transport uses the **opposite bearing** (see `src/wildfire_smoke/wind.py`).
 
 **Important:** the risk score is a **demonstration / operations correlation index**, not a health advisory model.
@@ -484,6 +486,28 @@ This wipes the Postgres volume, recreates topics, re-downloads Census data for t
 
 - Apply **`sql/migrations/011_phase11_dispersion.sql`** and **`sql/views/zzz_phase11_dispersion_views.sql`** before relying on Grafana panels or dispersion alerts (fresh volumes pick these up via **`make db-bootstrap`**).
 
+### Phase 12 — calibration metrics & evidence labels
+
+**Evidence labels (dispersion vs AQ)**
+
+- Each lag bucket row in **`analytics.dispersion_aq_comparisons`** includes **`evidence_label`** (for example **`no_aq_data`**, **`insufficient_aq_data`**, **`comparable`**, **`possible_overprediction`**, **`possible_underprediction`**, **`plausible_alignment`**). **Thin data is not success** — operators should read summaries via **`analytics.v_dispersion_aq_evidence_summary`**.
+- Thresholds are tuned with **`CALIBRATION_*`** env vars (see **`.env.example`**).
+
+**Risk evaluation**
+
+- **`make evaluate-risk`** prefers **`RISK_EVAL_MODEL_VERSION`** (default: current **`SMOKE_RISK_MODEL_VERSION`**). Correlation is omitted unless enough paired samples exist; **`STRICT_EVALUATION=1`** fails fast when observations or overlaps are missing (default stays permissive **exit 0**).
+
+**Operational helpers**
+
+- **`make load-risk-observation-fixtures`** — idempotent reload of **`tests/fixtures/risk_observations_sample.jsonl`** (metadata **`phase12_fixture`**; deletes prior Phase 12 fixture rows first).
+- **`make calibration-summary`** — prints key **`analytics.v_*`** calibration views.
+- **`make calibration-demo`** — no-secrets chain: aligned replay → normalize/grid → plume → dispersion → **v5** → AQ compare → load observation fixtures → **evaluate-risk** → summary.
+- **`make integration-regression`** optionally sets **`LOAD_RISK_OBSERVATION_FIXTURES=1`** to load fixtures and run **`evaluate-risk`** after **`compare-dispersion-aq`**.
+
+**Phase 12 DDL**
+
+- Apply **`sql/migrations/012_phase12_calibration_metrics.sql`** and **`sql/views/zzz_phase12_calibration_views.sql`**, then reapply **`sql/views/zzz_phase9_fn_alert_candidates.sql`** so alert arity matches Python (**23** threshold parameters including calibration slots).
+
 ## Makefile targets
 
 | Target          | Purpose                                              |
@@ -506,6 +530,9 @@ This wipes the Postgres volume, recreates topics, re-downloads Census data for t
 | `make compute-dispersion` | Gaussian **`gaussian_v0`** proxy into **`analytics.smoke_dispersion_exposures`** (**`DISPERSION_ENABLED=1`**) |
 | `make compare-dispersion-aq` | Lag-window AQ scaffolding vs dispersion (**`DISPERSION_ENABLED=1`**) |
 | `make dispersion-demo` | Aligned fixtures → normalize/grid → plume → dispersion → risk **v5** → AQ compare |
+| `make load-risk-observation-fixtures` | Load JSONL into **`analytics.risk_observations`** (Phase 12 sample) |
+| `make calibration-summary` | Print Phase 12 calibration / evaluation views |
+| `make calibration-demo` | Full no-secrets pipeline + observation load + **evaluate-risk** + summary |
 | `make compute-risk`   | Run Python smoke-risk job (in Spark container)   |
 | `make replay-fixtures`| Fixture Kafka publish + normalize + plume + risk |
 | `make replay-wind-fixtures` | Publish **`WIND_DRY_RUN`** wind fixture + normalize-wind |

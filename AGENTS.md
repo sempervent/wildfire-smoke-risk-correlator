@@ -41,6 +41,11 @@ This repository is a **local-first vertical slice** for correlating NASA FIRMS h
 - **Dispersion runs stay bounded:** respect **`DISPERSION_MAX_DISTANCE_KM`**, **`DISPERSION_MAX_TARGET_GEOGRAPHIES`**, **`DISPERSION_LOOKBACK_HOURS`**, and tract corpus guards (**`DISPERSION_ALLOW_LARGE_RUN`**)—no implicit national-scale tract fan-out.
 - **AQ comparison table:** **`analytics.dispersion_aq_comparisons`** and **`make compare-dispersion-aq`** are **lag-summary scaffolding** only; they do not establish forecast skill or epidemiological association without external study design.
 - **Fixture / integration path:** `make integration-regression` and **`make dispersion-demo`** must remain **no live API keys** when using dry-run + aligned fixtures.
+- **Phase 12 calibration honesty:** **`evidence_label`**, **`confidence_label`**, and Grafana calibration panels are **engineering triage aids** — never describe them as validated model performance, epidemiology, or regulatory proof.
+- **No-data ≠ success:** absence of AQ rows or evaluations must **not** be marketed as the model “passing”; distinguish **no data**, **insufficient data**, and **weak evidence** in prose and dashboards.
+- **Correlation gate:** do **not** treat Pearson **`correlation`** in **`risk_model_evaluations`** as meaningful when **`match_count`** is below **`RISK_EVAL_MIN_MATCH_COUNT`** (default **3**) or when variance collapses — the job omits **`correlation`** in those cases.
+- **Calibration alerts stay soft:** default **`ALERT_CALIBRATION_WARN_ONLY=1`** maps SQL severities toward **`info`** — do not escalate calibration mismatch alerts to paging without explicit ops configuration.
+- **Fixture observations:** JSONL under **`tests/fixtures/`** used by **`make load-risk-observation-fixtures`** must stay **deterministic and secret-free** (proxy labels only).
 
 ## Operating constraints
 

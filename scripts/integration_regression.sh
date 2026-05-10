@@ -68,6 +68,12 @@ make compute-risk RISK_MODEL_VERSION="${RISK_MODEL_VERSION}"
 echo "==> Dispersion vs AQ lag comparison"
 make compare-dispersion-aq DISPERSION_ENABLED="${DISPERSION_ENABLED}"
 
+if [[ "${LOAD_RISK_OBSERVATION_FIXTURES:-0}" == "1" ]]; then
+  echo "==> Risk observation fixtures + evaluate-risk (LOAD_RISK_OBSERVATION_FIXTURES=1)"
+  make load-risk-observation-fixtures
+  RISK_EVAL_MODEL_VERSION="${RISK_MODEL_VERSION}" make evaluate-risk
+fi
+
 make collect-lag
 
 make quality-check

@@ -212,6 +212,33 @@ if [[ "${DISPERSION_ENABLED:-0}" == "1" ]]; then
   if [[ "${AQCOMP}" == "0" ]]; then
     warn "DISPERSION_ENABLED=1 but dispersion_aq_comparisons empty (optional — run compare-dispersion-aq when AQ data exists)."
   fi
+  AQ_THIN="$(psql_exec -At -c "
+    SELECT CASE
+      WHEN COUNT(*) = 0 THEN 'none'
+      WHEN SUM(CASE WHEN evidence_label IN ('no_aq_data','insufficient_aq_data') THEN 1 ELSE 0 END) = COUNT(*) THEN 'only_thin'
+      ELSE 'mixed'
+    END
+    FROM analytics.dispersion_aq_comparisons
+    WHERE computed_at >= now() - interval '72 hours';
+  ")"
+  if [[ "${AQCOMP}" != "0" ]] && [[ "${AQ_THIN}" == "only_thin" ]]; then
+    warn "Recent dispersion_aq_comparisons rows are all thin/no-AQ evidence labels (not proof the model matched reality)."
+  fi
+fi
+
+echo "==> Phase 12 calibration surfaces (warnings)"
+psql_exec -c "SELECT 1 FROM analytics.v_calibration_confidence_summary LIMIT 1;" >/dev/null 2>&1 \
+  || warn "analytics.v_calibration_confidence_summary missing (apply Phase 12 views after migration 012)."
+psql_exec -c "SELECT * FROM analytics.v_calibration_confidence_summary LIMIT 1;" >/dev/null 2>&1 \
+  && echo "calibration_confidence_summary_rows_ok=1" || true
+V5rows="$(psql_exec -At -c "SELECT COUNT(*)::text FROM analytics.smoke_risk_scores WHERE model_version='v5';")"
+EVrows="$(psql_exec -At -c "SELECT COUNT(*)::text FROM analytics.risk_model_evaluations WHERE model_version='v5';")"
+if [[ "${DISPERSION_ENABLED:-0}" == "1" ]] && [[ "${V5rows}" =~ ^[0-9]+$ ]] && [[ "${V5rows}" != "0" ]] && [[ "${EVrows}" == "0" ]]; then
+  warn "v5 risk scores exist but no v5 rows in analytics.risk_model_evaluations (run evaluate-risk after observations)."
+fi
+ROCOV="$(psql_exec -At -c "SELECT COUNT(*)::text FROM analytics.risk_observations;")"
+if [[ "${ROCOV}" =~ ^[0-9]+$ ]] && [[ "${ROCOV}" != "0" ]] && [[ "${ROCOV}" -lt 3 ]]; then
+  warn "analytics.risk_observations count=${ROCOV} (low coverage for calibration summaries)."
 fi
 
 echo "==> Parse errors / consumer offset evidence (warnings)"
