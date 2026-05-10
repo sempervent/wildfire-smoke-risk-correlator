@@ -78,6 +78,21 @@ def test_smoke_risk_geographies_override(monkeypatch) -> None:
     assert s.smoke_risk_geographies == "county"
 
 
+def test_smoke_risk_model_version_v5(monkeypatch) -> None:
+    monkeypatch.setenv("SMOKE_RISK_MODEL_VERSION", "v5")
+    s = Settings.from_env()
+    assert s.smoke_risk_model_version == "v5"
+
+
+def test_dispersion_defaults(monkeypatch) -> None:
+    monkeypatch.delenv("DISPERSION_ENABLED", raising=False)
+    monkeypatch.delenv("DISPERSION_MODEL_VERSION", raising=False)
+    s = Settings.from_env()
+    assert s.dispersion_enabled is False
+    assert s.dispersion_model_version == "gaussian_v0"
+    assert s.dispersion_max_target_geographies >= 1
+
+
 def test_settings_requires_key_for_live_firms(monkeypatch) -> None:
     monkeypatch.delenv("FIRMS_MAP_KEY", raising=False)
     monkeypatch.setenv("FIRMS_DRY_RUN", "0")

@@ -82,6 +82,21 @@ class Settings:
 
     grid_weather_points_lonlat: tuple[tuple[float, float], ...]
 
+    dispersion_enabled: bool
+    dispersion_model_version: str
+    dispersion_max_distance_km: float
+    dispersion_crosswind_sigma_km: float
+    dispersion_downwind_sigma_km: float
+    dispersion_min_wind_speed_mps: float
+    dispersion_source_strength_mode: str
+    dispersion_grid_resolution_km: float
+    dispersion_max_target_geographies: int
+    dispersion_lookback_hours: int
+    dispersion_use_grid_weather: bool
+    dispersion_fallback_to_station_wind: bool
+    dispersion_write_debug_fields: bool
+    dispersion_allow_large_run: bool
+
     @staticmethod
     def from_env() -> "Settings":
         load_dotenv(repo_root() / ".env", override=False)
@@ -175,8 +190,8 @@ class Settings:
         smoke_risk_model_version = (
             os.environ.get("RISK_MODEL_VERSION") or os.environ.get("SMOKE_RISK_MODEL_VERSION", "v2")
         ).strip().lower()
-        if smoke_risk_model_version not in {"v1", "v2", "v3", "v4"}:
-            raise ValueError("SMOKE_RISK_MODEL_VERSION must be one of: v1, v2, v3, v4")
+        if smoke_risk_model_version not in {"v1", "v2", "v3", "v4", "v5"}:
+            raise ValueError("SMOKE_RISK_MODEL_VERSION must be one of: v1, v2, v3, v4, v5")
 
         smoke_risk_lookback_hours = int(os.environ.get("SMOKE_RISK_LOOKBACK_HOURS", "24"))
         if smoke_risk_lookback_hours < 1:
@@ -206,6 +221,42 @@ class Settings:
                 raise ValueError("GRID_WEATHER_POINTS entries must be lon,lat separated by ';'")
             pts.append((float(parts[0].strip()), float(parts[1].strip())))
         grid_weather_points_lonlat = tuple(pts)
+
+        dispersion_enabled = os.environ.get("DISPERSION_ENABLED", "0").strip().lower() in {"1", "true", "yes"}
+        dispersion_model_version = os.environ.get("DISPERSION_MODEL_VERSION", "gaussian_v0").strip()
+        dispersion_max_distance_km = float(os.environ.get("DISPERSION_MAX_DISTANCE_KM", "150"))
+        dispersion_crosswind_sigma_km = float(os.environ.get("DISPERSION_CROSSWIND_SIGMA_KM", "15"))
+        dispersion_downwind_sigma_km = float(os.environ.get("DISPERSION_DOWNWIND_SIGMA_KM", "75"))
+        dispersion_min_wind_speed_mps = float(os.environ.get("DISPERSION_MIN_WIND_SPEED_MPS", "0.5"))
+        dispersion_source_strength_mode = os.environ.get("DISPERSION_SOURCE_STRENGTH_MODE", "frp").strip().lower()
+        dispersion_grid_resolution_km = float(os.environ.get("DISPERSION_GRID_RESOLUTION_KM", "10"))
+        dispersion_max_target_geographies = int(os.environ.get("DISPERSION_MAX_TARGET_GEOGRAPHIES", "500"))
+        if dispersion_max_target_geographies < 1:
+            raise ValueError("DISPERSION_MAX_TARGET_GEOGRAPHIES must be >= 1")
+        dispersion_lookback_hours = int(os.environ.get("DISPERSION_LOOKBACK_HOURS", "24"))
+        if dispersion_lookback_hours < 1:
+            raise ValueError("DISPERSION_LOOKBACK_HOURS must be >= 1")
+        dispersion_use_grid_weather = os.environ.get("DISPERSION_USE_GRID_WEATHER", "1").strip().lower() in {
+            "1",
+            "true",
+            "yes",
+        }
+        dispersion_fallback_to_station_wind = os.environ.get(
+            "DISPERSION_FALLBACK_TO_STATION_WIND", "1"
+        ).strip().lower() in {"1", "true", "yes"}
+        dispersion_write_debug_fields = os.environ.get("DISPERSION_WRITE_DEBUG_FIELDS", "1").strip().lower() in {
+            "1",
+            "true",
+            "yes",
+        }
+        dispersion_allow_large_run = os.environ.get("DISPERSION_ALLOW_LARGE_RUN", "0").strip().lower() in {
+            "1",
+            "true",
+            "yes",
+        }
+
+        if dispersion_source_strength_mode not in {"frp", "brightness", "unit"}:
+            raise ValueError("DISPERSION_SOURCE_STRENGTH_MODE must be one of: frp, brightness, unit")
 
         return Settings(
             kafka_bootstrap_servers=kafka_bootstrap_servers,
@@ -256,6 +307,20 @@ class Settings:
             fixture_time_mode=fixture_time_mode,
             fixture_relative_base_hours_ago=fixture_relative_base_hours_ago,
             grid_weather_points_lonlat=grid_weather_points_lonlat,
+            dispersion_enabled=dispersion_enabled,
+            dispersion_model_version=dispersion_model_version,
+            dispersion_max_distance_km=dispersion_max_distance_km,
+            dispersion_crosswind_sigma_km=dispersion_crosswind_sigma_km,
+            dispersion_downwind_sigma_km=dispersion_downwind_sigma_km,
+            dispersion_min_wind_speed_mps=dispersion_min_wind_speed_mps,
+            dispersion_source_strength_mode=dispersion_source_strength_mode,
+            dispersion_grid_resolution_km=dispersion_grid_resolution_km,
+            dispersion_max_target_geographies=dispersion_max_target_geographies,
+            dispersion_lookback_hours=dispersion_lookback_hours,
+            dispersion_use_grid_weather=dispersion_use_grid_weather,
+            dispersion_fallback_to_station_wind=dispersion_fallback_to_station_wind,
+            dispersion_write_debug_fields=dispersion_write_debug_fields,
+            dispersion_allow_large_run=dispersion_allow_large_run,
         )
 
 

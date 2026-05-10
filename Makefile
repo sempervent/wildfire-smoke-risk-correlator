@@ -1,6 +1,6 @@
 COMPOSE ?= docker compose
 
-.PHONY: up down reset db-bootstrap topics ingest-once ingest-live-once normalize normalize-wind normalize-grid-weather match-fire-weather compute-plume smoke-transport-demo smoke-test dlq-smoke-test grid-weather-demo grid-weather-smoke-test integration-regression integration-smoke-test assert-integration-state evaluate-risk test deps quality-check replay-fixtures replay-grid-weather-fixtures replay-wind-fixtures replay-bad-fixtures replay-dlq parse-errors parse-errors-compact consumer-offsets collect-lag kafka-lag grafana-up refresh-mviews alerts-check alerts-materialize alerts-send alerts-send-digest alerts-send-retry operational-cycle operational-scheduler-up demo
+.PHONY: up down reset db-bootstrap topics ingest-once ingest-live-once normalize normalize-wind normalize-grid-weather match-fire-weather compute-plume compute-dispersion smoke-transport-demo smoke-test dlq-smoke-test grid-weather-demo grid-weather-smoke-test integration-regression integration-smoke-test assert-integration-state evaluate-risk test deps quality-check replay-fixtures replay-grid-weather-fixtures replay-wind-fixtures replay-bad-fixtures replay-dlq parse-errors parse-errors-compact consumer-offsets collect-lag kafka-lag grafana-up refresh-mviews alerts-check alerts-materialize alerts-send alerts-send-digest alerts-send-retry operational-cycle operational-scheduler-up demo
 
 deps:
 	uv sync --extra dev
@@ -63,6 +63,9 @@ evaluate-risk:
 
 compute-plume:
 	bash scripts/run_compute_plume.sh
+
+compute-dispersion:
+	bash scripts/run_compute_dispersion.sh
 
 compute-risk:
 	bash scripts/run_compute_risk.sh
