@@ -833,16 +833,130 @@
       ],
       "title": "Plume exposures wind_grid_v2 (latest batch)",
       "type": "table"
+    },
+    {
+      "datasource": {"type": "postgres", "uid": "smoke_pg"},
+      "fieldConfig": {"defaults": {}, "overrides": []},
+      "gridPos": {"h": 7, "w": 12, "x": 0, "y": 190},
+      "id": 413,
+      "options": {"showHeader": true},
+      "targets": [
+        {
+          "datasource": {"type": "postgres", "uid": "smoke_pg"},
+          "editorMode": "code",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "SELECT * FROM analytics.v_integration_pipeline_counts;",
+          "refId": "A"
+        }
+      ],
+      "title": "Integration pipeline counts",
+      "type": "table"
+    },
+    {
+      "datasource": {"type": "postgres", "uid": "smoke_pg"},
+      "fieldConfig": {"defaults": {}, "overrides": []},
+      "gridPos": {"h": 7, "w": 12, "x": 12, "y": 190},
+      "id": 414,
+      "options": {"showHeader": true},
+      "targets": [
+        {
+          "datasource": {"type": "postgres", "uid": "smoke_pg"},
+          "editorMode": "code",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "SELECT * FROM analytics.v_fire_weather_unmatched ORDER BY acq_datetime DESC NULLS LAST LIMIT 200;",
+          "refId": "A"
+        }
+      ],
+      "title": "Fire–weather unmatched (24h)",
+      "type": "table"
+    },
+    {
+      "datasource": {"type": "postgres", "uid": "smoke_pg"},
+      "fieldConfig": {"defaults": {}, "overrides": []},
+      "gridPos": {"h": 8, "w": 12, "x": 0, "y": 197},
+      "id": 415,
+      "options": {"showHeader": true},
+      "targets": [
+        {
+          "datasource": {"type": "postgres", "uid": "smoke_pg"},
+          "editorMode": "code",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "SELECT geography_type, geoid, risk_score, risk_band, computed_at, explanation FROM analytics.v_latest_risk_v4_explanations ORDER BY risk_score DESC NULLS LAST LIMIT 200;",
+          "refId": "A"
+        }
+      ],
+      "title": "Latest v4 risk explanations",
+      "type": "table"
+    },
+    {
+      "datasource": {"type": "postgres", "uid": "smoke_pg"},
+      "fieldConfig": {"defaults": {}, "overrides": []},
+      "gridPos": {"h": 8, "w": 12, "x": 12, "y": 197},
+      "id": 416,
+      "options": {"showHeader": true},
+      "targets": [
+        {
+          "datasource": {"type": "postgres", "uid": "smoke_pg"},
+          "editorMode": "code",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "SELECT risk_observation_id, observed_at, geography_type, geoid, observation_type, observed_value, source FROM analytics.risk_observations ORDER BY observed_at DESC LIMIT 200;",
+          "refId": "A"
+        }
+      ],
+      "title": "Risk observations",
+      "type": "table"
+    },
+    {
+      "datasource": {"type": "postgres", "uid": "smoke_pg"},
+      "fieldConfig": {"defaults": {}, "overrides": []},
+      "gridPos": {"h": 7, "w": 12, "x": 0, "y": 205},
+      "id": 417,
+      "options": {"showHeader": true},
+      "targets": [
+        {
+          "datasource": {"type": "postgres", "uid": "smoke_pg"},
+          "editorMode": "code",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "SELECT risk_model_evaluation_id, model_version, evaluated_at, window_start, window_end, observation_type, match_count, mae, rmse FROM analytics.risk_model_evaluations ORDER BY evaluated_at DESC LIMIT 80;",
+          "refId": "A"
+        }
+      ],
+      "title": "Risk model evaluations",
+      "type": "table"
+    },
+    {
+      "datasource": {"type": "postgres", "uid": "smoke_pg"},
+      "fieldConfig": {"defaults": {}, "overrides": []},
+      "gridPos": {"h": 7, "w": 12, "x": 12, "y": 205},
+      "id": 418,
+      "options": {"showHeader": true},
+      "targets": [
+        {
+          "datasource": {"type": "postgres", "uid": "smoke_pg"},
+          "editorMode": "code",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "SELECT * FROM analytics.v_risk_calibration_summary;",
+          "refId": "A"
+        }
+      ],
+      "title": "Risk calibration summary",
+      "type": "table"
     }
   ],
   "refresh": "30s",
   "schemaVersion": 39,
-  "tags": ["smoke", "wildfire", "phase3", "phase5", "phase6", "phase7", "phase8", "phase9"],
+  "tags": ["smoke", "wildfire", "phase3", "phase5", "phase6", "phase7", "phase8", "phase9", "phase10"],
   "templating": {"list": []},
   "time": {"from": "now-7d", "to": "now"},
   "timepicker": {},
   "timezone": "browser",
-  "title": "Wildfire Smoke Risk (Phase 3–9 ops)",
+  "title": "Wildfire Smoke Risk (Phase 3–10 ops)",
   "uid": "wildfire-smoke-phase2",
   "version": 5,
   "weekStart": ""
