@@ -719,16 +719,130 @@
       ],
       "title": "Recent DLQ replay items",
       "type": "table"
+    },
+    {
+      "datasource": {"type": "postgres", "uid": "smoke_pg"},
+      "fieldConfig": {"defaults": {}, "overrides": []},
+      "gridPos": {"h": 8, "w": 12, "x": 0, "y": 167},
+      "id": 407,
+      "options": {"showHeader": true},
+      "targets": [
+        {
+          "datasource": {"type": "postgres", "uid": "smoke_pg"},
+          "editorMode": "code",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "SELECT weather_cell_id, source, grid_id, valid_time, latitude, longitude, wind_speed_mps, wind_direction_degrees, temperature_c, relative_humidity_percent FROM analytics.v_latest_weather_grid_cells ORDER BY valid_time DESC NULLS LAST LIMIT 200;",
+          "refId": "A"
+        }
+      ],
+      "title": "Latest weather grid cells",
+      "type": "table"
+    },
+    {
+      "datasource": {"type": "postgres", "uid": "smoke_pg"},
+      "fieldConfig": {"defaults": {}, "overrides": []},
+      "gridPos": {"h": 8, "w": 12, "x": 12, "y": 167},
+      "id": 408,
+      "options": {"showHeader": true},
+      "targets": [
+        {
+          "datasource": {"type": "postgres", "uid": "smoke_pg"},
+          "editorMode": "code",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "SELECT detection_id, weather_cell_id, match_method, distance_km, time_delta_minutes, wind_speed_mps, wind_direction_degrees, matched_at FROM analytics.v_fire_weather_matches ORDER BY matched_at DESC NULLS LAST LIMIT 200;",
+          "refId": "A"
+        }
+      ],
+      "title": "Fire–weather matches",
+      "type": "table"
+    },
+    {
+      "datasource": {"type": "postgres", "uid": "smoke_pg"},
+      "fieldConfig": {"defaults": {}, "overrides": []},
+      "gridPos": {"h": 7, "w": 12, "x": 0, "y": 175},
+      "id": 409,
+      "options": {"showHeader": true},
+      "targets": [
+        {
+          "datasource": {"type": "postgres", "uid": "smoke_pg"},
+          "editorMode": "code",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "SELECT * FROM analytics.v_fire_weather_match_summary;",
+          "refId": "A"
+        }
+      ],
+      "title": "Fire–weather match summary",
+      "type": "table"
+    },
+    {
+      "datasource": {"type": "postgres", "uid": "smoke_pg"},
+      "fieldConfig": {"defaults": {}, "overrides": []},
+      "gridPos": {"h": 7, "w": 12, "x": 12, "y": 175},
+      "id": 410,
+      "options": {"showHeader": true},
+      "targets": [
+        {
+          "datasource": {"type": "postgres", "uid": "smoke_pg"},
+          "editorMode": "code",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "SELECT * FROM analytics.v_grid_weather_operational_summary;",
+          "refId": "A"
+        }
+      ],
+      "title": "Grid weather operational summary",
+      "type": "table"
+    },
+    {
+      "datasource": {"type": "postgres", "uid": "smoke_pg"},
+      "fieldConfig": {"defaults": {}, "overrides": []},
+      "gridPos": {"h": 8, "w": 12, "x": 0, "y": 182},
+      "id": 411,
+      "options": {"showHeader": true},
+      "targets": [
+        {
+          "datasource": {"type": "postgres", "uid": "smoke_pg"},
+          "editorMode": "code",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "SELECT geography_type, geoid, risk_score, risk_band, model_version, computed_at, explanation FROM analytics.v_latest_smoke_risk_v4 ORDER BY risk_score DESC NULLS LAST LIMIT 200;",
+          "refId": "A"
+        }
+      ],
+      "title": "Smoke risk v4 (latest batch)",
+      "type": "table"
+    },
+    {
+      "datasource": {"type": "postgres", "uid": "smoke_pg"},
+      "fieldConfig": {"defaults": {}, "overrides": []},
+      "gridPos": {"h": 8, "w": 12, "x": 12, "y": 182},
+      "id": 412,
+      "options": {"showHeader": true},
+      "targets": [
+        {
+          "datasource": {"type": "postgres", "uid": "smoke_pg"},
+          "editorMode": "code",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "SELECT geography_type, geoid, detection_id, exposure_score, distance_km, wind_from_degrees, window_start, window_end, explanation FROM analytics.v_latest_smoke_plume_exposures_v2 ORDER BY exposure_score DESC NULLS LAST LIMIT 200;",
+          "refId": "A"
+        }
+      ],
+      "title": "Plume exposures wind_grid_v2 (latest batch)",
+      "type": "table"
     }
   ],
   "refresh": "30s",
   "schemaVersion": 39,
-  "tags": ["smoke", "wildfire", "phase3", "phase5", "phase6", "phase7", "phase8"],
+  "tags": ["smoke", "wildfire", "phase3", "phase5", "phase6", "phase7", "phase8", "phase9"],
   "templating": {"list": []},
   "time": {"from": "now-7d", "to": "now"},
   "timepicker": {},
   "timezone": "browser",
-  "title": "Wildfire Smoke Risk (Phase 3–8 ops)",
+  "title": "Wildfire Smoke Risk (Phase 3–9 ops)",
   "uid": "wildfire-smoke-phase2",
   "version": 5,
   "weekStart": ""
