@@ -32,7 +32,7 @@ echo "parse_errors_row_count=${CNT}"
 echo "==> DLQ smoke: replay_dlq dry-run (postgres source)"
 DRY_RUN=1 bash "${ROOT_DIR}/scripts/replay_dlq.sh"
 
-echo "==> DLQ smoke: Phase 7 views compile"
+echo "==> DLQ smoke: DLQ / parse-error SQL views compile"
 psql_exec -c "SELECT COUNT(*) FROM analytics.v_parse_errors_open;"
 psql_exec -c "SELECT COUNT(*) FROM analytics.v_parse_error_summary;"
 psql_exec -c "SELECT COUNT(*) FROM analytics.v_parse_errors_recent;"

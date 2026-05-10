@@ -15,6 +15,7 @@ All notable changes to this project are documented here. Releases are **engineer
 
 - **README.md** rewritten as a concise project front door; detailed material moved into MkDocs pages.
 - **Package version → 1.1.0**.
+- **Product language in docs, scripts, and tests:** user-facing text and test names use **feature areas** (DLQ, gridded weather, calibration, etc.) instead of internal “Phase N” labels. **On-disk SQL migration and view filenames are unchanged** for compatibility.
 
 ### Notes
 
@@ -36,9 +37,9 @@ All notable changes to this project are documented here. Releases are **engineer
 
 ### Added
 
-- **Phase 14 — release hardening:** canonical **`analytics.fn_alert_candidates`** migration (**`013_phase14_canonical_alert_function.sql`**) applied **after** dependent views via **`scripts/bootstrap_db.sh`** to eliminate ambiguous overload drift on legacy volumes.
+- **Release hardening (canonical alert function):** migration **`013_phase14_canonical_alert_function.sql`** installs the single **`analytics.fn_alert_candidates`** signature and is applied **after** dependent views via **`scripts/bootstrap_db.sh`** to eliminate ambiguous overload drift on legacy volumes.
 - **`make db-doctor`** / **`wildfire_smoke.db_doctor`** — structural checks (schemas, key tables/views, single overload + **23** parameters, selectable calibration export views).
-- **`make repair-alert-function`** — reapplies Phase **10–12** alert-dependent views then migration **013** for operator repair on drifted databases.
+- **`make repair-alert-function`** — reapplies **integration, dispersion, and calibration** alert-dependent views then migration **013** for operator repair on drifted databases.
 - **`make release-fresh-volume-test`** — isolated Compose project (**`wildfire-smoke-release-test`** default) fresh-volume walkthrough (minimal census by default).
 - **`make release-manifest`** — non-secret **`artifacts/release/<version>/release-manifest.json`** generator.
 - **Optional `parquet` extra** (`pyproject.toml`) for Parquet calibration exports.
@@ -53,7 +54,7 @@ All notable changes to this project are documented here. Releases are **engineer
 
 ### Added
 
-- **Phase 13 — CI / release hardening:** GitHub Actions **fast CI** (ruff, pytest, no-Compose smoke, Grafana JSON validation) and **optional Compose integration** workflow (manual, weekly, or PR label **`integration`**).
+- **CI / release automation:** GitHub Actions **fast CI** (ruff, pytest, no-Compose smoke, Grafana JSON validation) and **optional Compose integration** workflow (manual, weekly, or PR label **`integration`**).
 - **Minimal census fixtures** for CI/integration (`tests/fixtures/census_minimal_*.geojson`, `make db-bootstrap-minimal`) — synthetic geometries only, **not** operational TIGER data.
 - **Immutable calibration exports** (`wildfire_smoke.export_calibration`, `make export-calibration*`) writing timestamped bundles under `artifacts/calibration/` with redacted metadata.
 - **Release gate** (`scripts/release_check.sh`, `make release-check`) and **`make version`** (package + optional git metadata).

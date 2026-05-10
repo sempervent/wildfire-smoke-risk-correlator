@@ -99,7 +99,7 @@ FIRMS_DRY_RUN=1 OPENAQ_DRY_RUN=1 WIND_DRY_RUN=1 uv run python -m wildfire_smoke.
 FIRMS_DRY_RUN=1 OPENAQ_DRY_RUN=1 WIND_DRY_RUN=1 uv run python -m wildfire_smoke.producers.openaq_producer
 FIRMS_DRY_RUN=1 OPENAQ_DRY_RUN=1 WIND_DRY_RUN=1 uv run python -m wildfire_smoke.producers.wind_producer
 
-echo "==> Phase 7 durable parse_errors / offset evidence tables exist"
+echo "==> DLQ / durable parse_errors + consumer offset evidence tables exist"
 ${COMPOSE} exec -T postgres psql -v ON_ERROR_STOP=1 -U "${POSTGRES_USER}" -d "${POSTGRES_DB}" -c "SELECT COUNT(*) FROM analytics.parse_errors;"
 ${COMPOSE} exec -T postgres psql -v ON_ERROR_STOP=1 -U "${POSTGRES_USER}" -d "${POSTGRES_DB}" -c "SELECT COUNT(*) FROM analytics.kafka_consumer_offsets;"
 
@@ -111,11 +111,11 @@ DRY_RUN=1 bash "${ROOT_DIR}/scripts/replay_dlq.sh"
 echo "==> SQL views compile / are queryable"
 ${COMPOSE} exec -T postgres psql -v ON_ERROR_STOP=1 -U "${POSTGRES_USER}" -d "${POSTGRES_DB}" -c "SELECT COUNT(*) FROM analytics.smoke_risk_by_county;"
 ${COMPOSE} exec -T postgres psql -v ON_ERROR_STOP=1 -U "${POSTGRES_USER}" -d "${POSTGRES_DB}" -c "SELECT COUNT(*) FROM analytics.smoke_risk_by_tract;"
-echo "==> Phase 2 analytics views compile / are queryable"
+echo "==> Core analytics views compile / are queryable"
 ${COMPOSE} exec -T postgres psql -v ON_ERROR_STOP=1 -U "${POSTGRES_USER}" -d "${POSTGRES_DB}" -c "SELECT COUNT(*) FROM analytics.v_source_freshness;"
 ${COMPOSE} exec -T postgres psql -v ON_ERROR_STOP=1 -U "${POSTGRES_USER}" -d "${POSTGRES_DB}" -c "SELECT COUNT(*) FROM analytics.v_data_quality_summary;"
 
-echo "==> Phase 3 GeoJSON / SLI / alert views compile / are queryable"
+echo "==> Maps / GeoJSON / SLI / alert views compile / are queryable"
 ${COMPOSE} exec -T postgres psql -v ON_ERROR_STOP=1 -U "${POSTGRES_USER}" -d "${POSTGRES_DB}" -c "SELECT COUNT(*) FROM analytics.v_latest_smoke_risk_county_geojson;"
 ${COMPOSE} exec -T postgres psql -v ON_ERROR_STOP=1 -U "${POSTGRES_USER}" -d "${POSTGRES_DB}" -c "SELECT COUNT(*) FROM analytics.v_latest_smoke_risk_tract_geojson;"
 ${COMPOSE} exec -T postgres psql -v ON_ERROR_STOP=1 -U "${POSTGRES_USER}" -d "${POSTGRES_DB}" -c "SELECT COUNT(*) FROM analytics.v_latest_fire_detections_geojson;"
@@ -129,7 +129,7 @@ bash "${ROOT_DIR}/scripts/run_compute_plume.sh"
 echo "==> Risk computation job runs (may insert 0 rows if no correlated window data)"
 bash "${ROOT_DIR}/scripts/run_compute_risk.sh"
 
-echo "==> Phase 6 smoke transport views compile / are queryable"
+echo "==> Smoke transport / wind-aware plume views compile / are queryable"
 ${COMPOSE} exec -T postgres psql -v ON_ERROR_STOP=1 -U "${POSTGRES_USER}" -d "${POSTGRES_DB}" -c "SELECT COUNT(*) FROM analytics.v_latest_wind_observations;"
 ${COMPOSE} exec -T postgres psql -v ON_ERROR_STOP=1 -U "${POSTGRES_USER}" -d "${POSTGRES_DB}" -c "SELECT COUNT(*) FROM analytics.v_latest_wind_observations_geojson;"
 ${COMPOSE} exec -T postgres psql -v ON_ERROR_STOP=1 -U "${POSTGRES_USER}" -d "${POSTGRES_DB}" -c "SELECT COUNT(*) FROM analytics.v_latest_smoke_plume_exposures;"
@@ -137,19 +137,19 @@ ${COMPOSE} exec -T postgres psql -v ON_ERROR_STOP=1 -U "${POSTGRES_USER}" -d "${
 ${COMPOSE} exec -T postgres psql -v ON_ERROR_STOP=1 -U "${POSTGRES_USER}" -d "${POSTGRES_DB}" -c "SELECT COUNT(*) FROM analytics.v_latest_smoke_risk_v3;"
 ${COMPOSE} exec -T postgres psql -v ON_ERROR_STOP=1 -U "${POSTGRES_USER}" -d "${POSTGRES_DB}" -c "SELECT COUNT(*) FROM analytics.v_smoke_transport_summary;"
 
-echo "==> Phase 7 DLQ / parse-error views compile / are queryable"
+echo "==> DLQ / parse-error SQL views compile / are queryable"
 ${COMPOSE} exec -T postgres psql -v ON_ERROR_STOP=1 -U "${POSTGRES_USER}" -d "${POSTGRES_DB}" -c "SELECT COUNT(*) FROM analytics.v_parse_errors_open;"
 ${COMPOSE} exec -T postgres psql -v ON_ERROR_STOP=1 -U "${POSTGRES_USER}" -d "${POSTGRES_DB}" -c "SELECT COUNT(*) FROM analytics.v_parse_error_summary;"
 ${COMPOSE} exec -T postgres psql -v ON_ERROR_STOP=1 -U "${POSTGRES_USER}" -d "${POSTGRES_DB}" -c "SELECT COUNT(*) FROM analytics.v_parse_errors_recent;"
 ${COMPOSE} exec -T postgres psql -v ON_ERROR_STOP=1 -U "${POSTGRES_USER}" -d "${POSTGRES_DB}" -c "SELECT COUNT(*) FROM analytics.v_consumer_offset_state;"
 ${COMPOSE} exec -T postgres psql -v ON_ERROR_STOP=1 -U "${POSTGRES_USER}" -d "${POSTGRES_DB}" -c "SELECT COUNT(*) FROM analytics.v_dlq_operational_summary;"
 
-echo "==> Phase 8 broker lag / replay bookkeeping tables"
+echo "==> Operational lag / broker watermark + replay bookkeeping tables"
 ${COMPOSE} exec -T postgres psql -v ON_ERROR_STOP=1 -U "${POSTGRES_USER}" -d "${POSTGRES_DB}" -c "SELECT COUNT(*) FROM analytics.kafka_topic_offsets;"
 ${COMPOSE} exec -T postgres psql -v ON_ERROR_STOP=1 -U "${POSTGRES_USER}" -d "${POSTGRES_DB}" -c "SELECT COUNT(*) FROM analytics.kafka_consumer_lag_observations;"
 ${COMPOSE} exec -T postgres psql -v ON_ERROR_STOP=1 -U "${POSTGRES_USER}" -d "${POSTGRES_DB}" -c "SELECT COUNT(*) FROM analytics.dlq_replay_runs;"
 
-echo "==> Phase 8 lag / pipeline views compile"
+echo "==> Operational lag / DLQ depth SQL views compile"
 ${COMPOSE} exec -T postgres psql -v ON_ERROR_STOP=1 -U "${POSTGRES_USER}" -d "${POSTGRES_DB}" -c "SELECT COUNT(*) FROM analytics.v_kafka_topic_depth;"
 ${COMPOSE} exec -T postgres psql -v ON_ERROR_STOP=1 -U "${POSTGRES_USER}" -d "${POSTGRES_DB}" -c "SELECT COUNT(*) FROM analytics.v_consumer_lag_latest;"
 ${COMPOSE} exec -T postgres psql -v ON_ERROR_STOP=1 -U "${POSTGRES_USER}" -d "${POSTGRES_DB}" -c "SELECT COUNT(*) FROM analytics.v_dlq_topic_depth;"
@@ -185,7 +185,7 @@ test -f "${ROOT_DIR}/docs/runbooks/dispersion-no-wind-matches.md"
 test -f "${ROOT_DIR}/docs/runbooks/dispersion-aq-mismatch-high.md"
 test -f "${ROOT_DIR}/docs/runbooks/dispersion-no-targets.md"
 
-echo "==> Phase 9 gridded weather (tables / views / topics)"
+echo "==> Gridded weather (tables / views / topics)"
 for t in weather.grid.raw weather.grid.dlq weather.grid.normalized; do
   ${COMPOSE} exec -T redpanda rpk topic describe "${t}" --brokers 127.0.0.1:9092 >/dev/null
 done
@@ -198,15 +198,15 @@ if [[ "${GRID_WEATHER_SMOKE:-0}" == "1" ]]; then
   bash "${ROOT_DIR}/scripts/grid_weather_demo.sh"
 fi
 
-echo "==> Phase 10 integration scripts / calibration hooks"
+echo "==> Integration regression scripts / calibration hooks"
 bash -n "${ROOT_DIR}/scripts/integration_regression.sh"
 bash -n "${ROOT_DIR}/scripts/assert_integration_state.sh"
 bash -n "${ROOT_DIR}/scripts/evaluate_risk_model.sh"
 ${COMPOSE} exec -T postgres psql -v ON_ERROR_STOP=1 -U "${POSTGRES_USER}" -d "${POSTGRES_DB}" -c "SELECT COUNT(*) FROM analytics.risk_observations;" >/dev/null 2>&1 || echo "WARN: analytics.risk_observations missing (apply migration 010)." >&2
-${COMPOSE} exec -T postgres psql -v ON_ERROR_STOP=1 -U "${POSTGRES_USER}" -d "${POSTGRES_DB}" -c "SELECT COUNT(*) FROM analytics.v_integration_pipeline_counts;" >/dev/null 2>&1 || echo "WARN: analytics.v_integration_pipeline_counts missing (apply Phase 10 views)." >&2
+${COMPOSE} exec -T postgres psql -v ON_ERROR_STOP=1 -U "${POSTGRES_USER}" -d "${POSTGRES_DB}" -c "SELECT COUNT(*) FROM analytics.v_integration_pipeline_counts;" >/dev/null 2>&1 || echo "WARN: analytics.v_integration_pipeline_counts missing (apply integration/calibration SQL views)." >&2
 bash "${ROOT_DIR}/scripts/evaluate_risk_model.sh"
 
-echo "==> Phase 11 dispersion scripts / DDL hooks"
+echo "==> Dispersion prototype scripts / DDL hooks"
 bash -n "${ROOT_DIR}/scripts/run_compute_dispersion.sh"
 bash -n "${ROOT_DIR}/scripts/run_compare_dispersion_aq.sh"
 bash -n "${ROOT_DIR}/scripts/dispersion_demo.sh"
@@ -217,19 +217,19 @@ if [[ "${DISPERSION_SMOKE:-0}" == "1" ]]; then
   bash "${ROOT_DIR}/scripts/dispersion_demo.sh"
 fi
 
-echo "==> Phase 12 calibration scripts / SQL hooks"
+echo "==> Calibration / evaluation scripts / SQL hooks"
 bash -n "${ROOT_DIR}/scripts/load_risk_observation_fixtures.sh"
 bash -n "${ROOT_DIR}/scripts/calibration_summary.sh"
 bash -n "${ROOT_DIR}/scripts/calibration_demo.sh"
 ${COMPOSE} exec -T postgres psql -v ON_ERROR_STOP=1 -U "${POSTGRES_USER}" -d "${POSTGRES_DB}" -c "SELECT COUNT(*) FROM analytics.risk_observation_features;" >/dev/null 2>&1 || echo "WARN: analytics.risk_observation_features missing (apply migration 012)." >&2
-${COMPOSE} exec -T postgres psql -v ON_ERROR_STOP=1 -U "${POSTGRES_USER}" -d "${POSTGRES_DB}" -c "SELECT 1 FROM analytics.v_dispersion_aq_evidence_summary LIMIT 1;" >/dev/null 2>&1 || echo "WARN: Phase 12 calibration views missing (apply zzz_phase12_calibration_views.sql)." >&2
+${COMPOSE} exec -T postgres psql -v ON_ERROR_STOP=1 -U "${POSTGRES_USER}" -d "${POSTGRES_DB}" -c "SELECT 1 FROM analytics.v_dispersion_aq_evidence_summary LIMIT 1;" >/dev/null 2>&1 || echo "WARN: calibration / evaluation views missing (apply sql/views/zzz_phase12_calibration_views.sql)." >&2
 
 if [[ "${CALIBRATION_SMOKE:-0}" == "1" ]]; then
   echo "==> CALIBRATION_SMOKE=1: calibration demo chain (Spark-heavy)"
   bash "${ROOT_DIR}/scripts/calibration_demo.sh"
 fi
 
-echo "==> Phase 4 alert persistence + routing (table + dry-run materialize + console send)"
+echo "==> Alert persistence + routing (table + dry-run materialize + console send)"
 ${COMPOSE} exec -T postgres psql -v ON_ERROR_STOP=1 -U "${POSTGRES_USER}" -d "${POSTGRES_DB}" -c \
   "SELECT COUNT(*) FROM analytics.alert_events;"
 ALERTS_DRY_RUN=1 bash "${ROOT_DIR}/scripts/materialize_alerts.sh"
@@ -238,7 +238,7 @@ bash -n "${ROOT_DIR}/scripts/run_operational_cycle.sh"
 bash -n "${ROOT_DIR}/scripts/live_ingest_once.sh"
 test -f "${ROOT_DIR}/docs/runbooks/alert-overview.md"
 
-echo "==> Phase 5 notification reliability surfaces"
+echo "==> Notification reliability surfaces"
 ${COMPOSE} exec -T postgres psql -v ON_ERROR_STOP=1 -U "${POSTGRES_USER}" -d "${POSTGRES_DB}" -c \
   "SELECT COUNT(*) FROM analytics.notification_attempts;"
 ${COMPOSE} exec -T postgres psql -v ON_ERROR_STOP=1 -U "${POSTGRES_USER}" -d "${POSTGRES_DB}" -c \

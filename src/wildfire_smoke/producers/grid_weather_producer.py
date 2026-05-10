@@ -1,4 +1,4 @@
-"""Bounded gridded weather producer → Kafka ``weather.grid.raw`` (Phase 9–10)."""
+"""Bounded gridded weather producer → Kafka ``weather.grid.raw``."""
 
 from __future__ import annotations
 

@@ -112,7 +112,7 @@ def write_csv(path: Path, sql: str, settings: Settings) -> int:
                 cur.execute(sql)
             except psycopg.errors.UndefinedTable as exc:
                 raise RuntimeError(
-                    "Calibration export requires Phase 12 calibration views (apply "
+                    "Calibration export requires calibration / evaluation views (apply "
                     "sql/views/zzz_phase12_calibration_views.sql or run make db-bootstrap)."
                 ) from exc
             cols = [d[0] for d in (cur.description or ())]

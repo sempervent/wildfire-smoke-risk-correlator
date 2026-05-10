@@ -1,5 +1,5 @@
 """
-AQ lag-window summaries vs dispersion exposure — Phase 11/12 evaluation scaffolding only.
+AQ lag-window summaries vs dispersion exposure — evaluation scaffolding only (not validation).
 
 Persists explicit evidence labels (no_data vs weak vs alignment heuristics); not validation.
 """

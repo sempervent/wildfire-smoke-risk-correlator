@@ -1,4 +1,4 @@
-"""Parse gridded weather payloads into normalized cell rows (Phase 9)."""
+"""Parse gridded weather payloads into normalized cell rows."""
 
 from __future__ import annotations
 

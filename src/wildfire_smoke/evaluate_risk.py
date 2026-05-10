@@ -1,4 +1,4 @@
-"""Compare risk scores to analytics.risk_observations (Phase 10/12 hook — not validation)."""
+"""Compare risk scores to analytics.risk_observations (calibration hook — not validation)."""
 
 from __future__ import annotations
 

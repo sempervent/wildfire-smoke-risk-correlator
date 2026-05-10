@@ -1,4 +1,4 @@
-"""Parse-error persistence, DLQ envelopes, and consumer offset evidence (Phase 7)."""
+"""Parse-error persistence, DLQ envelopes, and consumer offset evidence."""
 
 from __future__ import annotations
 

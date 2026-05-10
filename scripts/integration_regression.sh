@@ -88,7 +88,7 @@ bash "${ROOT_DIR}/scripts/assert_integration_state.sh"
 
 echo "==> Summary"
 docker compose exec -T postgres psql -U "${POSTGRES_USER:-smoke}" -d "${POSTGRES_DB:-smoke}" -c "SELECT * FROM analytics.v_integration_pipeline_counts;" || {
-  echo "WARN: v_integration_pipeline_counts missing — apply Phase 10 SQL views." >&2
+  echo "WARN: v_integration_pipeline_counts missing — apply integration/calibration SQL views." >&2
 }
 
 echo "integration-regression complete."

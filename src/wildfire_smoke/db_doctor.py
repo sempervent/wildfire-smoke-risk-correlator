@@ -1,4 +1,4 @@
-"""Postgres structural checks for migration / alert-function drift (Phase 14)."""
+"""Postgres structural checks for migration / alert-function drift."""
 
 from __future__ import annotations
 

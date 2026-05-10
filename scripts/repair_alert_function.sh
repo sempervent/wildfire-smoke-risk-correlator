@@ -8,7 +8,7 @@ POSTGRES_USER="${POSTGRES_USER:-smoke}"
 POSTGRES_DB="${POSTGRES_DB:-smoke}"
 COMPOSE="${COMPOSE:-docker compose}"
 
-echo "==> repair_alert_function: refresh dependent views (Phase 10–12)"
+echo "==> repair_alert_function: refresh dependent views (integration, dispersion, calibration)"
 for view in \
   zzz_phase10_10_integration_and_calibration_views.sql \
   zzz_phase11_dispersion_views.sql \

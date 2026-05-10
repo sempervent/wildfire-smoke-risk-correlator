@@ -1,4 +1,4 @@
-"""Optional relative rewriting of fixture timestamps for integration demos (Phase 10).
+"""Optional relative rewriting of fixture timestamps for integration demos.
 
 Never mutates files on disk — only in-memory payloads sent to Kafka.
 """

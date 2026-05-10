@@ -1,4 +1,4 @@
-"""Match recent fire detections to nearest gridded weather cells (Phase 9)."""
+"""Match recent fire detections to nearest gridded weather cells."""
 
 from __future__ import annotations
 

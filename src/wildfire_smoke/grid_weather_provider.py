@@ -1,4 +1,4 @@
-"""Gridded weather providers (fixture + NWS gridpoint) — Phase 10 abstraction."""
+"""Gridded weather providers (fixture + NWS gridpoint)."""
 
 from __future__ import annotations
 

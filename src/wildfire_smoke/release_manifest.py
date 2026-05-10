@@ -1,4 +1,4 @@
-"""Write a non-secret JSON manifest for release tagging (Phase 14)."""
+"""Write a non-secret JSON manifest for release tagging."""
 
 from __future__ import annotations
 

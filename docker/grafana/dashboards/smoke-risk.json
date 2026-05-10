@@ -2339,15 +2339,16 @@
   "tags": [
     "smoke",
     "wildfire",
-    "phase3",
-    "phase5",
-    "phase6",
-    "phase7",
-    "phase8",
-    "phase9",
-    "phase10",
-    "phase11",
-    "phase12"
+    "maps-sli",
+    "alerts",
+    "notifications",
+    "smoke-transport",
+    "dlq",
+    "operational-lag",
+    "grid-weather",
+    "integration-calibration",
+    "dispersion",
+    "calibration"
   ],
   "templating": {
     "list": []
@@ -2359,7 +2360,7 @@
   "timepicker": {},
   "timezone": "browser",
   "title": "Wildfire Smoke Risk (operations)",
-  "uid": "wildfire-smoke-phase2",
+  "uid": "wildfire-smoke-operations",
   "version": 6,
   "weekStart": ""
 }

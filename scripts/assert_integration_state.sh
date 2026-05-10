@@ -128,7 +128,7 @@ fi
 
 if [[ "${LOAD_RISK_OBSERVATION_FIXTURES}" == "1" ]] || [[ "${STRICT_CALIBRATION_ASSERTS}" == "1" ]]; then
   psql_exec -c "SELECT 1 FROM analytics.v_calibration_confidence_summary LIMIT 1;" >/dev/null 2>&1 \
-    || fail "Phase 12 calibration views missing (apply sql/views/zzz_phase12_calibration_views.sql after migration 012)."
+    || fail "Calibration / evaluation views missing (apply sql/views/zzz_phase12_calibration_views.sql after migration 012)."
   OBS_CALIB="$(psql_exec -At -c "SELECT COUNT(*)::text FROM analytics.risk_observations;")"
   if [[ "${LOAD_RISK_OBSERVATION_FIXTURES}" == "1" ]]; then
     [[ "${OBS_CALIB}" =~ ^[0-9]+$ ]] || fail "bad risk_observations count"

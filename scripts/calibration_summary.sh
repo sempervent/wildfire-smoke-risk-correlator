@@ -8,7 +8,7 @@ COMPOSE="${COMPOSE:-docker compose}"
 POSTGRES_USER="${POSTGRES_USER:-smoke}"
 POSTGRES_DB="${POSTGRES_DB:-smoke}"
 
-echo "==> calibration-summary (Phase 12 views)"
+echo "==> calibration-summary (calibration / evaluation views)"
 
 ${COMPOSE} exec -T postgres psql -v ON_ERROR_STOP=1 -U "${POSTGRES_USER}" -d "${POSTGRES_DB}" <<'SQL'
 SELECT 'v_dispersion_aq_evidence_summary' AS view_name, COUNT(*)::bigint AS rows FROM analytics.v_dispersion_aq_evidence_summary;

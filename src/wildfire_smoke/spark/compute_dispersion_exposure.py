@@ -1,5 +1,5 @@
 """
-Bounded Gaussian dispersion proxy (``gaussian_v0``) — Phase 11.
+Bounded Gaussian dispersion proxy (``gaussian_v0``); engineering correlation only.
 
 Not HYSPLIT / not regulatory / not health guidance. See ``wildfire_smoke.dispersion``.
 """

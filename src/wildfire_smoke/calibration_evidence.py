@@ -1,4 +1,4 @@
-"""Evidence classification for dispersion vs AQ calibration (Phase 12 — not scientific validation)."""
+"""Evidence classification for dispersion vs AQ calibration (not scientific validation)."""
 
 from __future__ import annotations
 

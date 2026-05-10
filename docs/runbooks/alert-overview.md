@@ -1,6 +1,6 @@
 # Alert overview
 
-Alerts start as **rows from `analytics.fn_alert_candidates`** (thresholds via `ALERT_*` env vars). Phase 4 **materializes** them into **`analytics.alert_events`** so duplicates collapse per stable **fingerprint**, then optional **notifiers** emit messages.
+Alerts start as **rows from `analytics.fn_alert_candidates`** (thresholds via `ALERT_*` env vars). **Materialization** turns them into **`analytics.alert_events`** so duplicates collapse per stable **fingerprint**, then optional **notifiers** emit messages.
 
 ## Lifecycle
 

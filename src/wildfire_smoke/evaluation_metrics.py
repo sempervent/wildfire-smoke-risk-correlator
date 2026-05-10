@@ -1,4 +1,4 @@
-"""Risk vs observation evaluation helpers (Phase 12 — engineering metrics only)."""
+"""Risk vs observation evaluation helpers (engineering metrics only)."""
 
 from __future__ import annotations
 

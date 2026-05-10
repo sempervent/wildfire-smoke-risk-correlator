@@ -1,5 +1,5 @@
 """
-Gaussian-ish dispersion **proxy** for engineering correlation (Phase 11).
+Gaussian-ish dispersion **proxy** for engineering correlation (not regulatory modeling).
 
 This is **not** HYSPLIT, regulatory dispersion, or public-health-grade modeling.
 It complements corridor plumes (``wind_v1`` / ``wind_grid_v2``) with a separate

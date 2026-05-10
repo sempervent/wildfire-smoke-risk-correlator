@@ -1,4 +1,4 @@
-"""Collect broker watermark + approximate consumer lag observations into Postgres (Phase 8)."""
+"""Collect broker watermark + approximate consumer lag observations into Postgres."""
 
 from __future__ import annotations
 

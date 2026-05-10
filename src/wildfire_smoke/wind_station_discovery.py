@@ -1,4 +1,4 @@
-"""Bounded NWS observation station discovery using WIND_BBOX (Phase 8)."""
+"""Bounded NWS observation station discovery using WIND_BBOX (operational lag stack)."""
 
 from __future__ import annotations
 

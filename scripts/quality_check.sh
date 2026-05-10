@@ -113,21 +113,21 @@ if [[ "${RISK_LAST}" != "0" ]]; then
   fi
 fi
 
-echo "==> Phase 7 Kafka topics (DLQ + normalization.errors)"
+echo "==> Kafka topics (source DLQs + normalization.errors)"
 for t in firms.hotspots.dlq openaq.measurements.dlq weather.wind.dlq normalization.errors; do
   if ! ${COMPOSE} exec -T redpanda rpk topic describe "${t}" --brokers 127.0.0.1:9092 >/dev/null 2>&1; then
     fail "Missing Kafka topic ${t} (run make topics)."
   fi
 done
 
-echo "==> Phase 9 Kafka topics (gridded weather)"
+echo "==> Gridded weather Kafka topics"
 for t in weather.grid.raw weather.grid.dlq weather.grid.normalized; do
   if ! ${COMPOSE} exec -T redpanda rpk topic describe "${t}" --brokers 127.0.0.1:9092 >/dev/null 2>&1; then
     fail "Missing Kafka topic ${t} (run make topics)."
   fi
 done
 
-echo "==> Phase 9 gridded weather DDL / views compile"
+echo "==> Gridded weather DDL / views compile"
 psql_exec -c "SELECT COUNT(*) FROM normalized.weather_grid_cells;"
 psql_exec -c "SELECT COUNT(*) FROM analytics.v_latest_weather_grid_cells;"
 psql_exec -c "SELECT COUNT(*) FROM analytics.v_fire_weather_matches;"
@@ -150,7 +150,7 @@ if [[ "${GRID_WEATHER_ENABLED:-0}" == "1" ]]; then
   fi
 fi
 
-echo "==> Phase 10 integration / calibration surfaces"
+echo "==> Integration regression / calibration surfaces"
 RO_TBL="$(psql_exec -At -c "SELECT COUNT(*) FROM information_schema.tables WHERE table_schema='analytics' AND table_name='risk_observations';")"
 if [[ "${RO_TBL}" != "1" ]]; then
   warn "analytics.risk_observations missing (apply sql/migrations/010_phase10_calibration.sql)."
@@ -179,13 +179,13 @@ else
   warn "analytics.v_integration_pipeline_counts missing (apply sql/views/zzz_phase10_10_integration_and_calibration_views.sql)."
 fi
 
-echo "==> Phase 11 dispersion surfaces (warnings)"
+echo "==> Dispersion prototype surfaces (warnings)"
 DIS_TBL="$(psql_exec -At -c "SELECT COUNT(*) FROM information_schema.tables WHERE table_schema='analytics' AND table_name='smoke_dispersion_exposures';")"
 if [[ "${DIS_TBL}" != "1" ]]; then
   warn "analytics.smoke_dispersion_exposures missing (apply sql/migrations/011_phase11_dispersion.sql)."
 else
-  psql_exec -c "SELECT COUNT(*) FROM analytics.v_dispersion_operational_summary;" >/dev/null 2>&1 || warn "analytics.v_dispersion_operational_summary missing (apply Phase 11 views)."
-  psql_exec -c "SELECT COUNT(*) FROM analytics.v_latest_smoke_risk_v5;" >/dev/null 2>&1 || warn "analytics.v_latest_smoke_risk_v5 missing (apply Phase 11 views)."
+  psql_exec -c "SELECT COUNT(*) FROM analytics.v_dispersion_operational_summary;" >/dev/null 2>&1 || warn "analytics.v_dispersion_operational_summary missing (apply dispersion SQL views)."
+  psql_exec -c "SELECT COUNT(*) FROM analytics.v_latest_smoke_risk_v5;" >/dev/null 2>&1 || warn "analytics.v_latest_smoke_risk_v5 missing (apply dispersion SQL views)."
 fi
 
 if [[ "${DISPERSION_ENABLED:-0}" == "1" ]]; then
@@ -226,9 +226,9 @@ if [[ "${DISPERSION_ENABLED:-0}" == "1" ]]; then
   fi
 fi
 
-echo "==> Phase 12 calibration surfaces (warnings)"
+echo "==> Calibration / evaluation surfaces (warnings)"
 psql_exec -c "SELECT 1 FROM analytics.v_calibration_confidence_summary LIMIT 1;" >/dev/null 2>&1 \
-  || warn "analytics.v_calibration_confidence_summary missing (apply Phase 12 views after migration 012)."
+  || warn "analytics.v_calibration_confidence_summary missing (apply calibration views after migration 012)."
 psql_exec -c "SELECT * FROM analytics.v_calibration_confidence_summary LIMIT 1;" >/dev/null 2>&1 \
   && echo "calibration_confidence_summary_rows_ok=1" || true
 V5rows="$(psql_exec -At -c "SELECT COUNT(*)::text FROM analytics.smoke_risk_scores WHERE model_version='v5';")"
@@ -263,7 +263,7 @@ if [[ "${OFF_EV}" == "0" ]]; then
   warn "No analytics.kafka_consumer_offsets rows for spark-normalize% yet (expected until normalizers run in this environment)."
 fi
 
-echo "==> Phase 8 lag / DLQ depth views compile"
+echo "==> Operational lag / DLQ depth views compile"
 psql_exec -c "SELECT COUNT(*) FROM analytics.v_kafka_topic_depth;"
 psql_exec -c "SELECT COUNT(*) FROM analytics.v_consumer_lag_latest;"
 psql_exec -c "SELECT COUNT(*) FROM analytics.v_dlq_topic_depth;"
