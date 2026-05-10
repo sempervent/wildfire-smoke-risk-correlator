@@ -150,6 +150,35 @@ if [[ "${GRID_WEATHER_ENABLED:-0}" == "1" ]]; then
   fi
 fi
 
+echo "==> Phase 10 integration / calibration surfaces"
+RO_TBL="$(psql_exec -At -c "SELECT COUNT(*) FROM information_schema.tables WHERE table_schema='analytics' AND table_name='risk_observations';")"
+if [[ "${RO_TBL}" != "1" ]]; then
+  warn "analytics.risk_observations missing (apply sql/migrations/010_phase10_calibration.sql)."
+else
+  psql_exec -c "SELECT COUNT(*) FROM analytics.risk_observations;" >/dev/null
+fi
+IPC_VIEW="$(psql_exec -At -c "SELECT COUNT(*) FROM information_schema.views WHERE table_schema='analytics' AND table_name='v_integration_pipeline_counts';")"
+if [[ "${IPC_VIEW}" == "1" ]]; then
+  psql_exec -c "SELECT * FROM analytics.v_integration_pipeline_counts;"
+  if [[ "${GRID_WEATHER_ENABLED:-0}" == "1" ]]; then
+    V4R="$(psql_exec -At -c "SELECT risk_v4_rows::text FROM analytics.v_integration_pipeline_counts LIMIT 1;")"
+    if [[ "${V4R}" == "0" ]]; then
+      warn "GRID_WEATHER_ENABLED=1 but risk_v4_rows=0 (run compute-risk RISK_MODEL_VERSION=v4)."
+    fi
+    UM="$(psql_exec -At -c "
+      SELECT COUNT(*)::text FROM normalized.fire_detections f
+      WHERE f.acq_datetime >= now() - interval '24 hours'
+        AND NOT EXISTS (SELECT 1 FROM analytics.fire_weather_matches m WHERE m.detection_id = f.detection_id);
+    ")"
+    GC="$(psql_exec -At -c "SELECT grid_cells_24h::text FROM analytics.v_integration_pipeline_counts LIMIT 1;")"
+    if [[ "${EXPECT_ALIGNED_MATCHES:-0}" == "1" ]] && [[ "${GC}" != "0" ]] && [[ "${UM}" != "0" ]]; then
+      warn "EXPECT_ALIGNED_MATCHES=1 but recent fires remain unmatched (count=${UM})."
+    fi
+  fi
+else
+  warn "analytics.v_integration_pipeline_counts missing (apply sql/views/zzz_phase10_10_integration_and_calibration_views.sql)."
+fi
+
 echo "==> Parse errors / consumer offset evidence (warnings)"
 OPEN_PE="$(psql_exec -At -c "SELECT COUNT(*)::text FROM analytics.parse_errors WHERE status = 'open';")"
 if [[ "${OPEN_PE}" != "0" ]]; then

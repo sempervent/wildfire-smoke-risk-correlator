@@ -54,6 +54,9 @@ def stable_fingerprint_details(alert_type: str, details: dict[str, Any]) -> dict
         "no_recent_grid_weather",
         "fire_weather_unmatched_high",
         "grid_weather_parse_errors_high",
+        "integration_pipeline_incomplete",
+        "v4_risk_missing",
+        "fire_weather_match_missing",
     }:
         return {}
     return {}
@@ -86,6 +89,9 @@ def fingerprint_for_candidate(
             "no_recent_grid_weather",
             "fire_weather_unmatched_high",
             "grid_weather_parse_errors_high",
+            "integration_pipeline_incomplete",
+            "v4_risk_missing",
+            "fire_weather_match_missing",
         }
         else title
     )

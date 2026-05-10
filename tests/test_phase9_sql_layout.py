@@ -29,3 +29,6 @@ def test_phase9_migrations_initdb_views_and_alert_fn_exist() -> None:
     assert "no_recent_grid_weather" in alerts_txt
     assert "fire_weather_unmatched_high" in alerts_txt
     assert "grid_weather_parse_errors_high" in alerts_txt
+    assert "integration_pipeline_incomplete" in alerts_txt
+    assert "v4_risk_missing" in alerts_txt
+    assert "fire_weather_match_missing" in alerts_txt

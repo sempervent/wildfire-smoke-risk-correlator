@@ -644,6 +644,79 @@ AS $$
       AND source_topic = 'weather.grid.raw'
   ) pe
   WHERE pe.c >= p_parse_errors_warn_count
+
+  UNION ALL
+
+  SELECT
+    'integration_pipeline_incomplete'::text,
+    'warn'::text,
+    NULL::text,
+    NULL::text,
+    'Integration pipeline coverage incomplete'::text,
+    format(
+      'fires_24h=%s aq_24h=%s wind_24h=%s grid_cells_24h=%s kafka_offsets=%s',
+      ipc.fires_24h,
+      ipc.aq_24h,
+      ipc.wind_24h,
+      ipc.grid_cells_24h,
+      ipc.kafka_topic_offset_rows
+    ),
+    now(),
+    jsonb_build_object(
+      'fires_24h', ipc.fires_24h,
+      'aq_24h', ipc.aq_24h,
+      'wind_24h', ipc.wind_24h,
+      'grid_cells_24h', ipc.grid_cells_24h,
+      'kafka_topic_offset_rows', ipc.kafka_topic_offset_rows
+    )
+  FROM analytics.v_integration_pipeline_counts ipc
+  WHERE ipc.fires_24h > 0
+    AND (
+      ipc.aq_24h = 0
+      OR ipc.wind_24h = 0
+      OR ipc.grid_cells_24h = 0
+      OR ipc.kafka_topic_offset_rows = 0
+    )
+
+  UNION ALL
+
+  SELECT
+    'v4_risk_missing'::text,
+    'warn'::text,
+    NULL::text,
+    NULL::text,
+    'No smoke risk v4 scores materialized'::text,
+    format('fires_24h=%s risk_v4_rows=%s', ipc.fires_24h, ipc.risk_v4_rows),
+    now(),
+    jsonb_build_object('fires_24h', ipc.fires_24h, 'risk_v4_rows', ipc.risk_v4_rows)
+  FROM analytics.v_integration_pipeline_counts ipc
+  WHERE ipc.fires_24h > 0
+    AND ipc.risk_v4_rows = 0
+
+  UNION ALL
+
+  SELECT
+    'fire_weather_match_missing'::text,
+    'warn'::text,
+    NULL::text,
+    NULL::text,
+    'Fire detections present but no fire–weather matches'::text,
+    format(
+      'fires_24h=%s grid_cells_24h=%s matches=%s',
+      ipc.fires_24h,
+      ipc.grid_cells_24h,
+      ipc.total_fire_weather_matches
+    ),
+    now(),
+    jsonb_build_object(
+      'fires_24h', ipc.fires_24h,
+      'grid_cells_24h', ipc.grid_cells_24h,
+      'total_fire_weather_matches', ipc.total_fire_weather_matches
+    )
+  FROM analytics.v_integration_pipeline_counts ipc
+  WHERE ipc.fires_24h > 0
+    AND ipc.grid_cells_24h > 0
+    AND ipc.total_fire_weather_matches = 0
 $$;
 
 CREATE OR REPLACE VIEW analytics.v_alert_candidates AS
@@ -669,4 +742,4 @@ FROM analytics.fn_alert_candidates(
 );
 
 COMMENT ON VIEW analytics.v_alert_candidates IS
-  'Default-parameter alert union; override thresholds via analytics.fn_alert_candidates(...) or scripts/check_alerts.sh.';
+  'Default-parameter alert union (Phase 10 integration SLIs); override thresholds via analytics.fn_alert_candidates(...) or scripts/check_alerts.sh.';

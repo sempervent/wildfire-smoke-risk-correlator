@@ -14,6 +14,9 @@ def test_runbooks_yaml_maps_known_alert_types() -> None:
     assert "no_recent_grid_weather" in m
     assert "fire_weather_unmatched_high" in m
     assert "grid_weather_parse_errors_high" in m
+    assert "integration_pipeline_incomplete" in m
+    assert "v4_risk_missing" in m
+    assert "fire_weather_match_missing" in m
     slug = runbook_slug_for_alert_type("high_smoke_risk", m)
     assert slug == "high-smoke-risk"
 
