@@ -48,3 +48,15 @@ mappings:
   replay_failures_recent:
     slug: replay-failures-recent
     path: docs/runbooks/replay-failures-recent.md
+  grid_weather_stale:
+    slug: grid-weather-stale
+    path: docs/runbooks/grid-weather-stale.md
+  no_recent_grid_weather:
+    slug: no-recent-grid-weather
+    path: docs/runbooks/no-recent-grid-weather.md
+  fire_weather_unmatched_high:
+    slug: fire-weather-unmatched-high
+    path: docs/runbooks/fire-weather-unmatched-high.md
+  grid_weather_parse_errors_high:
+    slug: grid-weather-parse-errors-high
+    path: docs/runbooks/parse-errors-high.md

@@ -40,6 +40,9 @@ class AlertThresholds:
     kafka_lag_critical_messages: int
     dlq_depth_warn_messages: int
     dlq_depth_critical_messages: int
+    grid_weather_stale_hours: int
+    fire_weather_unmatched_warn_count: int
+    fire_weather_unmatched_critical_count: int
 
 
 def alert_thresholds_from_env() -> AlertThresholds:
@@ -58,4 +61,11 @@ def alert_thresholds_from_env() -> AlertThresholds:
         kafka_lag_critical_messages=_positive_int(os.environ.get("ALERT_KAFKA_LAG_CRITICAL_MESSAGES"), 1000),
         dlq_depth_warn_messages=_positive_int(os.environ.get("ALERT_DLQ_DEPTH_WARN_MESSAGES"), 1),
         dlq_depth_critical_messages=_positive_int(os.environ.get("ALERT_DLQ_DEPTH_CRITICAL_MESSAGES"), 100),
+        grid_weather_stale_hours=_positive_int(os.environ.get("ALERT_GRID_WEATHER_STALE_HOURS"), 6),
+        fire_weather_unmatched_warn_count=_positive_int(
+            os.environ.get("ALERT_FIRE_WEATHER_UNMATCHED_WARN_COUNT"), 5
+        ),
+        fire_weather_unmatched_critical_count=_positive_int(
+            os.environ.get("ALERT_FIRE_WEATHER_UNMATCHED_CRITICAL_COUNT"), 25
+        ),
     )

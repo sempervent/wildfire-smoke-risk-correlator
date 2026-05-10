@@ -50,6 +50,10 @@ def stable_fingerprint_details(alert_type: str, details: dict[str, Any]) -> dict
         "kafka_lag_high",
         "dlq_depth_high",
         "replay_failures_recent",
+        "grid_weather_stale",
+        "no_recent_grid_weather",
+        "fire_weather_unmatched_high",
+        "grid_weather_parse_errors_high",
     }:
         return {}
     return {}
@@ -78,6 +82,10 @@ def fingerprint_for_candidate(
             "kafka_lag_high",
             "dlq_depth_high",
             "replay_failures_recent",
+            "grid_weather_stale",
+            "no_recent_grid_weather",
+            "fire_weather_unmatched_high",
+            "grid_weather_parse_errors_high",
         }
         else title
     )
@@ -101,7 +109,8 @@ def fetch_candidates(conn: psycopg.Connection) -> list[tuple[Any, ...]]:
             SELECT alert_type, severity, geography_type, geoid, title, description, observed_at, details
             FROM analytics.fn_alert_candidates(
               %s, %s, %s::double precision, %s, %s::double precision, %s, %s, %s,
-              %s, %s, %s::bigint, %s::bigint, %s::bigint, %s::bigint
+              %s, %s, %s::bigint, %s::bigint, %s::bigint, %s::bigint,
+              %s, %s, %s
             )
             """,
             (
@@ -119,6 +128,9 @@ def fetch_candidates(conn: psycopg.Connection) -> list[tuple[Any, ...]]:
                 thr.kafka_lag_critical_messages,
                 thr.dlq_depth_warn_messages,
                 thr.dlq_depth_critical_messages,
+                thr.grid_weather_stale_hours,
+                thr.fire_weather_unmatched_warn_count,
+                thr.fire_weather_unmatched_critical_count,
             ),
         )
         return list(cur.fetchall())
