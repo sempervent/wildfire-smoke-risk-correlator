@@ -1,5 +1,5 @@
 """
-Wind corridor plume exposure approximation (``wind_v1``).
+Wind corridor plume exposure approximation (``wind_v1`` and ``wind_grid_v2``).
 
 This is an engineering heuristic for dashboards and correlation experiments.
 It is **not** an atmospheric dispersion model and must not be interpreted as
@@ -22,8 +22,6 @@ from wildfire_smoke.settings import Settings
 from wildfire_smoke.wind import angular_difference_degrees, bearing_degrees, downwind_bearing
 
 log = logging.getLogger(__name__)
-
-PLUME_MODEL_VERSION = "wind_v1"
 
 
 def _window_bounds(settings: Settings) -> tuple[datetime, datetime]:
@@ -61,12 +59,127 @@ DO UPDATE SET
 """
 
 
+def _fetch_station_wind(conn, settings: Settings, fire: dict[str, Any]) -> dict[str, Any] | None:
+    flon = float(fire["longitude"])
+    flat = float(fire["latitude"])
+    acq = fire["acq_datetime"]
+    radius_m = settings.wind_match_radius_km * 1000.0
+    lookback_half_hours = settings.wind_match_lookback_hours
+    with conn.cursor(row_factory=dict_row) as cur:
+        cur.execute(
+            """
+            SELECT wind_observation_id, wind_direction_degrees, wind_speed_mps, observed_at,
+                   ST_DistanceSphere(
+                     ST_SetSRID(ST_MakePoint(%s, %s), 4326),
+                     geom
+                   ) / 1000.0 AS dist_km
+            FROM normalized.wind_observations
+            WHERE wind_direction_degrees IS NOT NULL
+              AND observed_at >= %s::timestamptz - (%s || ' hours')::interval
+              AND observed_at <= %s::timestamptz + (%s || ' hours')::interval
+              AND ST_DWithin(
+                ST_SetSRID(ST_MakePoint(%s, %s), 4326)::geography,
+                geom::geography,
+                %s
+              )
+            ORDER BY dist_km ASC NULLS LAST
+            LIMIT 1
+            """,
+            (
+                flon,
+                flat,
+                acq,
+                lookback_half_hours,
+                acq,
+                lookback_half_hours,
+                flon,
+                flat,
+                radius_m,
+            ),
+        )
+        row = cur.fetchone()
+    if not row:
+        return None
+    return {
+        "kind": "station",
+        "wind_observation_id": str(row["wind_observation_id"]),
+        "weather_cell_id": None,
+        "wind_direction_degrees": float(row["wind_direction_degrees"]),
+        "wind_speed_mps": float(row["wind_speed_mps"]) if row.get("wind_speed_mps") is not None else None,
+        "dist_km": float(row["dist_km"]) if row.get("dist_km") is not None else None,
+        "time_delta_minutes": None,
+        "match_method": None,
+    }
+
+
+def _fetch_grid_wind(conn, settings: Settings, fire: dict[str, Any]) -> dict[str, Any] | None:
+    det_id = str(fire["detection_id"])
+    flon = float(fire["longitude"])
+    flat = float(fire["latitude"])
+    with conn.cursor(row_factory=dict_row) as cur:
+        cur.execute(
+            """
+            SELECT c.weather_cell_id::text AS weather_cell_id,
+                   m.distance_km,
+                   m.time_delta_minutes,
+                   c.wind_direction_degrees,
+                   c.wind_speed_mps,
+                   ST_DistanceSphere(ST_SetSRID(ST_MakePoint(%s, %s), 4326), c.geom) / 1000.0 AS dist_km
+            FROM analytics.fire_weather_matches m
+            JOIN normalized.weather_grid_cells c ON c.weather_cell_id = m.weather_cell_id
+            WHERE m.detection_id = %s
+              AND m.match_method = %s
+              AND c.wind_direction_degrees IS NOT NULL
+            ORDER BY m.matched_at DESC
+            LIMIT 1
+            """,
+            (flon, flat, det_id, settings.fire_weather_match_method),
+        )
+        row = cur.fetchone()
+    if not row:
+        return None
+    dk = row.get("distance_km")
+    if dk is None:
+        dk = row.get("dist_km")
+    return {
+        "kind": "grid",
+        "wind_observation_id": None,
+        "weather_cell_id": str(row["weather_cell_id"]),
+        "wind_direction_degrees": float(row["wind_direction_degrees"]),
+        "wind_speed_mps": float(row["wind_speed_mps"]) if row.get("wind_speed_mps") is not None else None,
+        "dist_km": float(dk) if dk is not None else None,
+        "time_delta_minutes": float(row["time_delta_minutes"]) if row.get("time_delta_minutes") is not None else None,
+        "match_method": settings.fire_weather_match_method,
+    }
+
+
+def _resolve_wind(
+    conn,
+    settings: Settings,
+    fire: dict[str, Any],
+    *,
+    plume_model_version: str,
+) -> tuple[dict[str, Any] | None, bool]:
+    """Returns (wind payload for scoring, fallback_used)."""
+
+    if plume_model_version != "wind_grid_v2":
+        w = _fetch_station_wind(conn, settings, fire)
+        return w, False
+
+    g = _fetch_grid_wind(conn, settings, fire)
+    if g is not None:
+        return g, False
+    if settings.plume_grid_fallback_to_station:
+        w = _fetch_station_wind(conn, settings, fire)
+        return w, True
+    return None, False
+
+
 def main() -> None:
     logging.basicConfig(level=os.environ.get("LOG_LEVEL", "INFO"))
     settings = Settings.from_env()
+    plume_model_version = settings.plume_model_version
     window_start, window_end = _window_bounds(settings)
-    radius_m = settings.wind_match_radius_km * 1000.0
-    lookback_half_hours = settings.wind_match_lookback_hours
     max_km = settings.plume_max_distance_km
     half_angle = settings.plume_half_angle_degrees
     max_dist_m = max_km * 1000.0
@@ -78,7 +191,7 @@ def main() -> None:
                 DELETE FROM analytics.smoke_plume_exposures
                 WHERE window_start = %s AND window_end = %s AND model_version = %s
                 """,
-                (window_start, window_end, PLUME_MODEL_VERSION),
+                (window_start, window_end, plume_model_version),
             )
         conn.commit()
 
@@ -101,49 +214,15 @@ def main() -> None:
             det_id = str(fire["detection_id"])
             flon = float(fire["longitude"])
             flat = float(fire["latitude"])
-            acq = fire["acq_datetime"]
             frp = float(fire["frp"]) if fire.get("frp") is not None else None
 
-            with conn.cursor(row_factory=dict_row) as cur:
-                cur.execute(
-                    """
-                    SELECT wind_observation_id, wind_direction_degrees, wind_speed_mps, observed_at,
-                           ST_DistanceSphere(
-                             ST_SetSRID(ST_MakePoint(%s, %s), 4326),
-                             geom
-                           ) / 1000.0 AS dist_km
-                    FROM normalized.wind_observations
-                    WHERE wind_direction_degrees IS NOT NULL
-                      AND observed_at >= %s::timestamptz - (%s || ' hours')::interval
-                      AND observed_at <= %s::timestamptz + (%s || ' hours')::interval
-                      AND ST_DWithin(
-                        ST_SetSRID(ST_MakePoint(%s, %s), 4326)::geography,
-                        geom::geography,
-                        %s
-                      )
-                    ORDER BY dist_km ASC NULLS LAST
-                    LIMIT 1
-                    """,
-                    (
-                        flon,
-                        flat,
-                        acq,
-                        lookback_half_hours,
-                        acq,
-                        lookback_half_hours,
-                        flon,
-                        flat,
-                        radius_m,
-                    ),
-                )
-                wind_row = cur.fetchone()
-
-            if not wind_row:
+            wind_src, fallback_used = _resolve_wind(conn, settings, fire, plume_model_version=plume_model_version)
+            if not wind_src:
                 continue
 
-            wind_from = float(wind_row["wind_direction_degrees"])
-            w_speed = float(wind_row["wind_speed_mps"]) if wind_row.get("wind_speed_mps") is not None else None
-            wid = str(wind_row["wind_observation_id"])
+            wind_from = float(wind_src["wind_direction_degrees"])
+            w_speed = wind_src.get("wind_speed_mps")
+            wid = wind_src.get("wind_observation_id")
             dw = downwind_bearing(wind_from)
             if dw is None:
                 continue
@@ -191,18 +270,25 @@ def main() -> None:
 
                     explanation: dict[str, Any] = {
                         "detection_id": det_id,
-                        "wind_observation_id": wid,
                         "components": comp_expl,
                         "half_angle_degrees": half_angle,
                         "plume_max_distance_km": max_km,
                         "disclaimer": "engineering corridor approximation; not dispersion modeling",
+                        "weather_cell_id": wind_src.get("weather_cell_id"),
+                        "match_method": wind_src.get("match_method"),
+                        "distance_to_weather_cell_km": wind_src.get("dist_km"),
+                        "time_delta_minutes": wind_src.get("time_delta_minutes"),
+                        "wind_source": "grid" if wind_src.get("kind") == "grid" else "station",
+                        "fallback_used": fallback_used,
                     }
+                    if wid:
+                        explanation["wind_observation_id"] = wid
 
                     with conn.cursor() as cur:
                         cur.execute(
                             UPSERT_PLUME,
                             (
-                                PLUME_MODEL_VERSION,
+                                plume_model_version,
                                 det_id,
                                 geo_type,
                                 geoid,
@@ -230,7 +316,7 @@ def main() -> None:
             "rows_upserted": inserted,
             "window_start": window_start.isoformat(),
             "window_end": window_end.isoformat(),
-            "model_version": PLUME_MODEL_VERSION,
+            "model_version": plume_model_version,
         },
     )
 

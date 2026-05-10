@@ -14,9 +14,12 @@ COMPUTE_ENV=(
   -e PLUME_MAX_DISTANCE_KM="${PLUME_MAX_DISTANCE_KM:-150}"
   -e PLUME_HALF_ANGLE_DEGREES="${PLUME_HALF_ANGLE_DEGREES:-30}"
   -e SMOKE_RISK_LOOKBACK_HOURS="${SMOKE_RISK_LOOKBACK_HOURS:-24}"
+  -e PLUME_MODEL_VERSION="${PLUME_MODEL_VERSION:-wind_v1}"
+  -e PLUME_GRID_FALLBACK_TO_STATION="${PLUME_GRID_FALLBACK_TO_STATION:-1}"
+  -e FIRE_WEATHER_MATCH_METHOD="${FIRE_WEATHER_MATCH_METHOD:-nearest_grid_cell}"
 )
 
-echo "Python: compute wind corridor plume exposures (wind_v1)..."
+echo "Python: compute wind corridor plume exposures (PLUME_MODEL_VERSION=${PLUME_MODEL_VERSION:-wind_v1})..."
 ${COMPOSE} exec -T \
   "${COMPUTE_ENV[@]}" \
   spark-master python3 /app/src/wildfire_smoke/spark/compute_plume_exposure.py
