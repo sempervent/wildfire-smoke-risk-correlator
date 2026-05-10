@@ -17,8 +17,9 @@ if [[ "${SMOKE_NO_COMPOSE:-0}" == "1" ]]; then
   echo "==> Grafana dashboard JSON"
   python3 -m json.tool "${ROOT_DIR}/docker/grafana/dashboards/smoke-risk.json" >/dev/null
 
-  echo "==> Phase 13 release / CI artifacts present"
-  test -f "${ROOT_DIR}/docs/release/v0.1.0.md"
+  echo "==> Phase 13/14 release / CI artifacts present"
+  test -f "${ROOT_DIR}/docs/release/v1.0.0.md"
+  test -f "${ROOT_DIR}/docs/release/v1.0.0-checklist.md"
   test -f "${ROOT_DIR}/CHANGELOG.md"
   test -f "${ROOT_DIR}/docs/architecture/system-overview.md"
   test -f "${ROOT_DIR}/docs/architecture/dataflow.md"
@@ -30,6 +31,10 @@ if [[ "${SMOKE_NO_COMPOSE:-0}" == "1" ]]; then
   if command -v uv >/dev/null 2>&1; then
     uv sync --extra dev >/dev/null
     CALIBRATION_EXPORT_DRY_RUN=1 uv run python -m wildfire_smoke.export_calibration
+    echo "==> db_doctor module import"
+    uv run python -c "import wildfire_smoke.db_doctor"
+    echo "==> release manifest dry-run"
+    RELEASE_MANIFEST_DRY_RUN=1 uv run python -m wildfire_smoke.release_manifest --dry-run >/dev/null
     echo "==> make version"
     make -C "${ROOT_DIR}" version
   else

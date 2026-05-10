@@ -1,6 +1,6 @@
 COMPOSE ?= docker compose
 
-.PHONY: up down reset db-bootstrap db-bootstrap-minimal topics ingest-once ingest-live-once normalize normalize-wind normalize-grid-weather match-fire-weather compute-plume compute-dispersion compare-dispersion-aq dispersion-demo load-risk-observation-fixtures calibration-summary calibration-demo smoke-transport-demo smoke-test dlq-smoke-test grid-weather-demo grid-weather-smoke-test integration-regression integration-smoke-test assert-integration-state evaluate-risk test deps quality-check replay-fixtures replay-grid-weather-fixtures replay-wind-fixtures replay-bad-fixtures replay-dlq parse-errors parse-errors-compact consumer-offsets collect-lag kafka-lag grafana-up refresh-mviews alerts-check alerts-materialize alerts-send alerts-send-digest alerts-send-retry operational-cycle operational-scheduler-up demo export-calibration export-calibration-csv export-calibration-parquet release-check version
+.PHONY: up down reset db-bootstrap db-bootstrap-minimal topics ingest-once ingest-live-once normalize normalize-wind normalize-grid-weather match-fire-weather compute-plume compute-dispersion compare-dispersion-aq dispersion-demo load-risk-observation-fixtures calibration-summary calibration-demo smoke-transport-demo smoke-test dlq-smoke-test grid-weather-demo grid-weather-smoke-test integration-regression integration-smoke-test assert-integration-state evaluate-risk test deps quality-check replay-fixtures replay-grid-weather-fixtures replay-wind-fixtures replay-bad-fixtures replay-dlq parse-errors parse-errors-compact consumer-offsets collect-lag kafka-lag grafana-up refresh-mviews alerts-check alerts-materialize alerts-send alerts-send-digest alerts-send-retry operational-cycle operational-scheduler-up demo export-calibration export-calibration-csv export-calibration-parquet release-check version db-doctor repair-alert-function release-fresh-volume-test release-manifest
 
 deps:
 	uv sync --extra dev
@@ -178,6 +178,18 @@ version:
 	else \
 		echo "git unavailable"; \
 	fi
+
+db-doctor:
+	bash scripts/db_doctor.sh
+
+repair-alert-function:
+	bash scripts/repair_alert_function.sh
+
+release-fresh-volume-test:
+	bash scripts/release_fresh_volume_test.sh
+
+release-manifest:
+	bash scripts/write_release_manifest.sh
 
 test:
 	uv run pytest -q
